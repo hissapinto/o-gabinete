@@ -5,13 +5,13 @@ ANO_REFERENCIA = 2024
 
 URL_VOTOS = f'https://dadosabertos.camara.leg.br/arquivos/votacoesVotos/csv/votacoesVotos-{ANO_REFERENCIA}.csv'
 URL_VOTACOES = f'https://dadosabertos.camara.leg.br/arquivos/votacoes/csv/votacoes-{ANO_REFERENCIA}.csv'
-
+URL_OBJETOS = f'https://dadosabertos.camara.leg.br/arquivos/votacoesObjetos/csv/votacoesObjetos-{ANO_REFERENCIA}.csv'
 
 def baixar_dados_brutos():
     pasta = RAIZ / "dados" / "brutos"
     pasta.mkdir(parents=True, exist_ok=True)
 
-    for url in [URL_VOTOS, URL_VOTACOES]:
+    for url in [URL_VOTOS, URL_VOTACOES, URL_OBJETOS]:
         nome_arquivo = url.split('/')[-1]
         caminho_arquivo = pasta / nome_arquivo
 
