@@ -1,0 +1,42 @@
+name: o-gabinete
+
+services:
+  database:
+    image: postgres:16-alpine
+    env_file: .env
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infra/db/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    build: ./src/api
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@database:5432/${POSTGRES_DB}
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./src/api:/app
+    depends_on:
+      database:
+        condition: service_healthy
+
+  frontend:
+    build: ./src/apresentacao
+    environment:
+      API_URL: http://backend:8000
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./src/apresentacao:/app
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
