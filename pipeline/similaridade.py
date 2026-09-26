@@ -1,7 +1,6 @@
-# Calcular a matriz de similaridade por cosseno entre deputados
+# Calcular a matriz de concordancia entre deputados (percentual de votos coincidentes)
 import numpy as np
 import pandas as pd
-from sklearn.metrics.pairwise import cosine_similarity
 from utils import RAIZ
 from coleta import ANO_REFERENCIA
 
@@ -19,21 +18,31 @@ def matriz_de_votos(df_votos):
     return matriz[(matriz != 0).any(axis=1)]
 
 
-def similaridade_cosseno(matriz, minimo_em_comum=MINIMO_VOTACOES_EM_COMUM):
+def concordancia(matriz, minimo_em_comum=MINIMO_VOTACOES_EM_COMUM):
+    """
+    Percentual de votos coincidentes (0 a 100) entre cada par de deputados,
+    contando só as votações em que os dois votaram. Como os votos valem +1 ou -1,
+    M @ M.T dá (concordâncias - discordâncias) e votou @ votou.T dá o total em comum.
+    Pares com menos de minimo_em_comum votações em comum e a diagonal ficam NaN.
+    """
     M = matriz.to_numpy(dtype=float)
-    S = cosine_similarity(M)
 
     votou = (M != 0).astype(float)
     em_comum = votou @ votou.T
-    S[em_comum < minimo_em_comum] = np.nan
 
-    return pd.DataFrame(S, index=matriz.index, columns=matriz.index)
+    with np.errstate(divide='ignore', invalid='ignore'):
+        C = ((M @ M.T) / em_comum + 1) / 2 * 100
+
+    C[em_comum < minimo_em_comum] = np.nan
+    np.fill_diagonal(C, np.nan)
+
+    return pd.DataFrame(C, index=matriz.index, columns=matriz.index)
 
 
 if __name__ == "__main__":
     pasta_processado = RAIZ / 'dados' / 'processado'
     df_votos = pd.read_csv(pasta_processado / f'votos-{ANO_REFERENCIA}-merito.csv')
 
-    similaridade = similaridade_cosseno(matriz_de_votos(df_votos))
-    similaridade.to_csv(pasta_processado / f'similaridade-{ANO_REFERENCIA}.csv')
-    print(f'Matriz {similaridade.shape[0]}x{similaridade.shape[1]} salva')
+    resultado = concordancia(matriz_de_votos(df_votos))
+    resultado.to_csv(pasta_processado / f'similaridade-{ANO_REFERENCIA}.csv')
+    print(f'Matriz {resultado.shape[0]}x{resultado.shape[1]} salva (concordancia em %)')
