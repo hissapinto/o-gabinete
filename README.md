@@ -68,7 +68,7 @@ Visualizar esse grafo permite identificar de forma intuitiva agrupamentos (bloco
 
 - importa periodicamente dados de deputados e de votações nominais da Câmara dos Deputados;
 - calcula um índice de similaridade de comportamento de voto entre cada par de deputados;
-- constrói um grafo não orientado ponderado (deputados = vértices, similaridade = arestas), persistido no arquivo `dados/grafos.txt`;
+- constrói um grafo não orientado ponderado (deputados = vértices, similaridade = arestas), persistido no arquivo `dados/grafo.txt`;
 - oferece uma aplicação de terminal com menu de operações sobre o grafo (leitura, gravação, inserção, remoção, exibição e análise de conexidade);
 - oferece, adicionalmente, uma interface web interativa para visualizar, buscar, filtrar e comparar deputados a partir desse grafo.
 
@@ -87,7 +87,7 @@ Visualizar esse grafo permite identificar de forma intuitiva agrupamentos (bloco
 2. Prototipação de baixa fidelidade da interface (wireframes).
 3. Investigação exploratória da fonte de dados (*spike*), para verificar o volume de votações nominais disponíveis antes de fixar a modelagem.
 4. Construção do pipeline de ingestão (download e tratamento dos arquivos e endpoints da Câmara).
-5. Implementação do motor de cálculo de similaridade e do gerador do arquivo `grafos.txt`.
+5. Implementação do motor de cálculo de similaridade e do gerador do arquivo `grafo.txt`.
 6. Implementação da estrutura de grafo e dos algoritmos de análise.
 7. Implementação da aplicação de terminal com o menu de operações.
 8. Implementação da interface web de visualização, busca, filtro e comparação.
@@ -137,7 +137,7 @@ A tabela abaixo compõe o **backlog inicial do produto**, com os requisitos orde
 **Regras de negócio identificadas:**
 
 - **RN01** — A similaridade entre dois deputados é calculada com base na proporção de votos coincidentes em proposições votadas por ambos.
-- **RN02** — Deputados com histórico de votação abaixo de um mínimo definido (ex.: 10 votações registradas) não entram no cálculo de similaridade, para evitar distorções estatísticas.
+- **RN02** — Deputados com histórico de votação abaixo de um mínimo definido (30 votações em comum com ao menos um colega, constante `MINIMO_VOTACOES_EM_COMUM`) não entram no cálculo de similaridade, para evitar distorções estatísticas.
 - **RN03** — O peso de cada aresta do grafo representa o percentual de concordância de voto entre os dois deputados, expresso como inteiro de 0 a 100.
 - **RN04** — A filiação partidária não influencia o peso da aresta. O partido é representado apenas como atributo visual do vértice, para que divergências em relação à própria bancada permaneçam visíveis.
 - **RN05** — Somente votações nominais entram no cálculo, uma vez que votações simbólicas não registram o voto individual de cada parlamentar.
@@ -195,13 +195,13 @@ Exibe os dois perfis lado a lado, o percentual de similaridade calculado e a lis
 - **Ator principal:** Usuário (Cidadão/Analista)
 - **Ator de suporte:** Portal de Dados Abertos da Câmara dos Deputados
 - **Nível:** Objetivo do usuário
-- **Pré-condições:** A base de dados de deputados e votações já foi importada e processada pelo pipeline (ver UC06); o arquivo `dados/grafos.txt` já foi gerado.
+- **Pré-condições:** A base de dados de deputados e votações já foi importada e processada pelo pipeline (ver UC06); o arquivo `dados/grafo.txt` já foi gerado.
 - **Garantia de sucesso (pós-condições):** O usuário visualiza, na tela principal, o grafo de similaridade com todos os deputados carregados, podendo interagir com ele (zoom, arraste, seleção de nós).
 
 **Cenário de sucesso principal:**
 
 1. O usuário acessa a aplicação "O Gabinete".
-2. O sistema carrega o grafo a partir do arquivo `dados/grafos.txt`.
+2. O sistema carrega o grafo a partir do arquivo `dados/grafo.txt`.
 3. O sistema renderiza os deputados como vértices e as similaridades como arestas ponderadas (espessura proporcional ao grau de similaridade, cor do vértice indicando o partido).
 4. O sistema exibe, junto ao grafo, um painel de legenda e estatísticas gerais (total de deputados carregados, fonte dos dados, período considerado).
 5. O usuário navega livremente pelo grafo (zoom, arraste, destaque de vértices ao passar o mouse).
@@ -252,7 +252,7 @@ flowchart LR
 
 ### 6.1 Visão geral
 
-A arquitetura segue o **padrão em camadas**, com uma decisão estruturante: o arquivo `dados/grafos.txt` funciona como **contrato explícito** entre o pipeline de ingestão e a aplicação. O pipeline é um subsistema executado offline, que produz um artefato; a aplicação consome esse artefato e não conhece a fonte de dados.
+A arquitetura segue o **padrão em camadas**, com uma decisão estruturante: o arquivo `dados/grafo.txt` funciona como **contrato explícito** entre o pipeline de ingestão e a aplicação. O pipeline é um subsistema executado offline, que produz um artefato; a aplicação consome esse artefato e não conhece a fonte de dados.
 
 A decisão está registrada em [`docs/adr/0001-arquitetura-em-camadas.md`](docs/adr/0001-arquitetura-em-camadas.md).
 
@@ -266,7 +266,7 @@ flowchart TB
         D["gerar_grafo.py<br/>aplica o limiar e escreve o arquivo"]
     end
 
-    E[("dados/grafos.txt<br/>contrato entre as camadas")]
+    E[("dados/grafo.txt<br/>contrato entre as camadas")]
 
     subgraph App["Aplicação"]
         F["Persistência<br/>persistencia.py"]
@@ -287,14 +287,14 @@ flowchart TB
 | **Pipeline** (subsistema offline) | `pipeline/coleta.py`, `pipeline/similaridade.py`, `pipeline/gerar_grafo.py` | Baixar os CSVs, consultar a API de deputados, calcular a similaridade e gerar o arquivo do grafo. Único lugar onde `pandas` e `requests` são utilizados. |
 | **Apresentação** | `src/apresentacao/menu.py`, `src/apresentacao/app.py`, `src/apresentacao/renderizacao.py` | Interação com o usuário, em duas formas: menu de terminal e interface web. |
 | **Negócio** | `src/negocio/grafo.py`, `src/negocio/logica_grafos.py` | Estrutura do grafo (lista de adjacência) e algoritmos de análise, entre eles a conexidade. |
-| **Persistência** | `src/persistencia/persistencia.py` | Leitura e gravação do arquivo `grafos.txt`, encapsulando o conhecimento do formato. |
-| **Dados** | `dados/grafos.txt` | Armazenamento do grafo em formato texto, versionado no repositório. |
+| **Persistência** | `src/persistencia/persistencia.py` | Leitura e gravação do arquivo `grafo.txt`, encapsulando o conhecimento do formato. |
+| **Dados** | `dados/grafo.txt` | Armazenamento do grafo em formato texto, versionado no repositório. |
 
 A dependência aponta sempre para baixo, e as camadas são fechadas: a apresentação não acessa a persistência diretamente. O ponto de entrada `src/main.py` não pertence a nenhuma camada — monta as peças e inicia a aplicação.
 
 **Fonte externa de dados.** Portal de Dados Abertos da Câmara dos Deputados, combinando os arquivos em lote (`votacoesVotos-{ano}.csv`, `votacoes-{ano}.csv`) para o histórico de votações — um download por ano, em vez de uma requisição por votação — e a API REST (documentada em [dadosabertos.camara.leg.br/swagger/api.html](https://dadosabertos.camara.leg.br/swagger/api.html)) para obter partido e unidade federativa de cada deputado. A investigação exploratória inicial está preservada em [`docs/spikes/`](docs/spikes/).
 
-**Consequência prática.** A aplicação de terminal não depende de rede, de `pandas` nem de bibliotecas externas de grafos: basta clonar o repositório e executar `python src/main.py`. Se o portal estiver indisponível no momento da demonstração, o comportamento não muda, pois o `grafos.txt` está versionado.
+**Consequência prática.** A aplicação de terminal não depende de rede, de `pandas` nem de bibliotecas externas de grafos: basta clonar o repositório e executar `python src/main.py`. Se o portal estiver indisponível no momento da demonstração, o comportamento não muda, pois o `grafo.txt` está versionado.
 
 ### 6.3 Estrutura de diretórios
 
@@ -302,7 +302,7 @@ A dependência aponta sempre para baixo, e as camadas são fechadas: a apresenta
 O_Gabinete/
 ├── dados/
 │   ├── brutos/                 CSVs baixados, não versionado
-│   └── grafos.txt              camada de dados
+│   └── grafo.txt              camada de dados
 ├── docs/
 │   ├── adr/                    registros de decisão
 │   └── spikes/                 investigação descartável
