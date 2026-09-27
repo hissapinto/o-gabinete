@@ -1,8 +1,21 @@
 """
-Created on Tue Feb 14 19:40:58 2023
+O Gabinete - Mapa de Similaridade Politica entre Deputados Federais
+Arquivo: src/negocio/filaCircular.py
 
-@author: icalc
+Integrantes:
+    Caio Ariel Cardoso Saraiva  - RA 10439611
+    Isabela Hissa Pinto         - RA 10441873
+    Kaique Barros Paiva         - RA 10441787
+
+Sintese:
+    Fila circular disponibilizada pelo professor na disciplina de Teoria dos
+    Grafos (codigo original de icalc, criado em 14/02/2023). Usada pela busca
+    em largura em logica_grafos.py, no calculo das componentes conexas.
+
+Historico de alteracoes:
+    24/09/2026 - Isabela - Inclusao do codigo da aula no projeto.
 """
+
 class FilaCircular:
     TAM_DEFAULT = 1100
     def __init__(self, tamanho=TAM_DEFAULT):
@@ -67,5 +80,3 @@ class FilaCircular:
     # Retorna o total de elementos da fila 
     def totalElementos(self):
         return self.qtde
-        
-

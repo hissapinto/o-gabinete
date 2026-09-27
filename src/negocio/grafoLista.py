@@ -1,8 +1,22 @@
 """
-Created on Tue Feb 14 16:01:03 2023
+O Gabinete - Mapa de Similaridade Politica entre Deputados Federais
+Arquivo: src/negocio/grafoLista.py
 
-@author: icalc
+Integrantes:
+    Caio Ariel Cardoso Saraiva  - RA 10439611
+    Isabela Hissa Pinto         - RA 10441873
+    Kaique Barros Paiva         - RA 10441787
+
+Sintese:
+    Classe Grafo em lista de adjacencia, disponibilizada pelo professor na
+    disciplina de Teoria dos Grafos (codigo original de icalc, criado em
+    14/02/2023). Serve de classe base para o GrafoPonderadoND (grafo.py),
+    que acrescenta pesos e rotulos.
+
+Historico de alteracoes:
+    24/09/2026 - Isabela - Inclusao do codigo da aula no projeto.
 """
+
 # Grafo como uma lista de adjacência
 class Grafo:
     TAM_MAX_DEFAULT = 100 # qtde de vértices máxima default
@@ -37,5 +51,3 @@ class Grafo:
                 print(f"{val:2d}", end="") 
 
         print("\n\nfim da impressao do grafo." )
-        
-        

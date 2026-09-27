@@ -1,3 +1,25 @@
+"""
+O Gabinete - Mapa de Similaridade Politica entre Deputados Federais
+Arquivo: pipeline/coleta.py
+
+Integrantes:
+    Caio Ariel Cardoso Saraiva  - RA 10439611
+    Isabela Hissa Pinto         - RA 10441873
+    Kaique Barros Paiva         - RA 10441787
+
+Sintese:
+    Primeira etapa do pipeline. Baixa do Portal de Dados Abertos da Camara
+    os arquivos CSV do ano de referencia (votos individuais, votacoes,
+    objetos das votacoes e proposicoes afetadas) para dados/brutos/,
+    pulando os que ja existem.
+
+Historico de alteracoes:
+    10/09/2026 - Isabela - Criacao do arquivo na estrutura inicial do projeto.
+    14/09/2026 - Kaique - Download dos CSVs de votos e votacoes de 2024.
+    14/09/2026 - Kaique - Inclusao do download do arquivo de objetos das votacoes.
+    25/09/2026 - Kaique - Inclusao do download do arquivo de proposicoes afetadas.
+"""
+
 import requests
 from utils import RAIZ
 

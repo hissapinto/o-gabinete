@@ -1,8 +1,19 @@
 """
-Sample de consulta à API de Dados Abertos da Câmara dos Deputados.
+O Gabinete - Mapa de Similaridade Politica entre Deputados Federais
+Arquivo: docs/spikes/camara_api.py
 
-Documentação:
-https://dadosabertos.camara.leg.br/swagger/api.html
+Integrantes:
+    Caio Ariel Cardoso Saraiva  - RA 10439611
+    Isabela Hissa Pinto         - RA 10441873
+    Kaique Barros Paiva         - RA 10441787
+
+Sintese:
+    Spike de consulta a API de Dados Abertos da Camara dos Deputados, usado
+    para explorar os endpoints antes da definicao do pipeline.
+    Documentacao: https://dadosabertos.camara.leg.br/swagger/api.html
+
+Historico de alteracoes:
+    09/09/2026 - Caio - Criacao do exemplo de integracao com a API da Camara.
 """
 
 import requests
@@ -422,4 +433,3 @@ AVISO: Alguns endpoints ainda não estão funcionando corretamente...!
 
 if __name__ == "__main__":
     menu()
-

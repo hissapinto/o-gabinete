@@ -1,3 +1,28 @@
+"""
+O Gabinete - Mapa de Similaridade Politica entre Deputados Federais
+Arquivo: pipeline/gerar_grafo.py
+
+Integrantes:
+    Caio Ariel Cardoso Saraiva  - RA 10439611
+    Isabela Hissa Pinto         - RA 10441873
+    Kaique Barros Paiva         - RA 10441787
+
+Sintese:
+    Ultima etapa do pipeline. Le a matriz de concordancia entre deputados
+    (gerada por similaridade.py) e grava dados/grafo.txt no formato do
+    enunciado, tipo 2 (grafo nao orientado com peso na aresta).
+
+    Regra de aresta: cada deputado e ligado aos seus K_VIZINHOS deputados de
+    maior concordancia, desde que ela seja de pelo menos CONCORDANCIA_MINIMA.
+    O peso da aresta e a concordancia, inteiro de 0 a 100. Deputados sem
+    nenhum par valido (menos de MINIMO_VOTACOES_EM_COMUM votacoes em comum
+    com qualquer outro, definido em similaridade.py) ficam fora do grafo.
+
+Historico de alteracoes:
+    10/09/2026 - Isabela - Criacao do arquivo na estrutura inicial do projeto.
+    26/09/2026 - Kaique - Geracao do grafo.txt (k vizinhos mais parecidos,
+                          concordancia minima e ordenacao alfabetica).
+"""
 
 import unicodedata
 import numpy as np

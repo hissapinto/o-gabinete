@@ -1,3 +1,28 @@
+"""
+O Gabinete - Mapa de Similaridade Politica entre Deputados Federais
+Arquivo: src/negocio/grafo.py
+
+Integrantes:
+    Caio Ariel Cardoso Saraiva  - RA 10439611
+    Isabela Hissa Pinto         - RA 10441873
+    Kaique Barros Paiva         - RA 10441787
+
+Sintese:
+    Estrutura de dados do grafo. Implementa um grafo NAO ORIENTADO COM PESO
+    NA ARESTA (tipo 2), como lista de adjacencia, estendendo a classe Grafo
+    apresentada em aula (grafoLista.py).
+
+    Cada posicao da lista de adjacencia guarda tuplas (vizinho, peso), e um
+    vetor paralelo guarda o rotulo (nome do deputado) de cada vertice.
+
+    Esta classe nao conhece arquivos nem interface: apenas representa o grafo.
+
+Historico de alteracoes:
+    24/09/2026 - Grupo - Criacao da classe a partir de grafoLista.py da aula.
+    26/09/2026 - Kaique - Arquivo renomeado de GrafoPonderadoND.py para
+                          grafo.py, nome usado nos imports.
+"""
+
 from grafoLista import Grafo as GrafoBase
 
 

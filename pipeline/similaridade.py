@@ -1,4 +1,26 @@
-# Calcular a matriz de concordancia entre deputados (percentual de votos coincidentes)
+"""
+O Gabinete - Mapa de Similaridade Politica entre Deputados Federais
+Arquivo: pipeline/similaridade.py
+
+Integrantes:
+    Caio Ariel Cardoso Saraiva  - RA 10439611
+    Isabela Hissa Pinto         - RA 10441873
+    Kaique Barros Paiva         - RA 10441787
+
+Sintese:
+    Terceira etapa do pipeline. Calcula a concordancia entre cada par de
+    deputados: o percentual de votos coincidentes (0 a 100), considerando
+    apenas as votacoes em que os dois votaram. Obstrucao conta como voto
+    contra; Abstencao e Artigo 17 ficam fora da conta. Pares com menos de
+    MINIMO_VOTACOES_EM_COMUM votacoes em comum ficam sem valor.
+
+Historico de alteracoes:
+    10/09/2026 - Isabela - Criacao do arquivo na estrutura inicial do projeto.
+    25/09/2026 - Kaique - Calculo da matriz de similaridade por cosseno.
+    26/09/2026 - Kaique - Metrica trocada para percentual de votos
+                          coincidentes, calculado so nas votacoes em comum.
+"""
+
 import numpy as np
 import pandas as pd
 from utils import RAIZ

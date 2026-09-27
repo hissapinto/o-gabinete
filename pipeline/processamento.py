@@ -1,3 +1,23 @@
+"""
+O Gabinete - Mapa de Similaridade Politica entre Deputados Federais
+Arquivo: pipeline/processamento.py
+
+Integrantes:
+    Caio Ariel Cardoso Saraiva  - RA 10439611
+    Isabela Hissa Pinto         - RA 10441873
+    Kaique Barros Paiva         - RA 10441787
+
+Sintese:
+    Segunda etapa do pipeline. Reduz o CSV de votos as colunas essenciais,
+    gera a tabela de deputados (nome, partido, UF e foto) e mantem apenas as
+    votacoes sobre o merito de proposicoes legislativas (PL, PEC, MPV, PLP,
+    PDC, PDL e PLN), descartando as votacoes procedimentais.
+
+Historico de alteracoes:
+    14/09/2026 - Kaique - Criacao da limpeza dos votos e da tabela de deputados.
+    25/09/2026 - Kaique - Inclusao do filtro de votacoes de merito.
+"""
+
 import pandas as pd
 from utils import RAIZ
 from coleta import ANO_REFERENCIA, baixar_dados_brutos
