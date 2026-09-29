@@ -252,92 +252,138 @@ flowchart LR
 
 ### 6.1 Visão geral
 
-A arquitetura segue o **padrão em camadas**, com uma decisão estruturante: o arquivo `dados/grafo.txt` funciona como **contrato explícito** entre o pipeline de ingestão e a aplicação. O pipeline é um subsistema executado offline, que produz um artefato; a aplicação consome esse artefato e não conhece a fonte de dados.
+A arquitetura segue o **padrão em camadas** e tem duas formas de execução, que compartilham o mesmo pipeline de dados:
 
-A decisão está registrada em [`docs/adr/0001-arquitetura-em-camadas.md`](docs/adr/0001-arquitetura-em-camadas.md).
+- **Aplicação de terminal** (Teoria dos Grafos): o arquivo `dados/grafo.txt` funciona como **contrato explícito** entre o pipeline de ingestão e a aplicação. O pipeline é um subsistema executado offline, que produz um artefato; a aplicação consome esse artefato e não conhece a fonte de dados. Decisão registrada em [`docs/adr/arquitetura_em_camadas.md`](docs/adr/arquitetura_em_camadas.md).
+- **Versão web** (Laboratório de Engenharia de Software): três serviços em containers, orquestrados por Docker Compose e executados no GitHub Codespaces. O frontend em Streamlit consome uma API em FastAPI, que consulta um banco PostgreSQL. Decisão registrada em [`docs/adr/introducao_banco_de_dados.md`](docs/adr/introducao_banco_de_dados.md).
 
 ```mermaid
 flowchart TB
-    A[("Portal de Dados Abertos<br/>Câmara dos Deputados<br/>API REST + arquivos CSV em lote")]
+    A[("Portal de Dados Abertos<br/>Câmara dos Deputados<br/>arquivos CSV em lote")]
 
-    subgraph Pipeline["Pipeline — subsistema offline"]
-        B["coleta.py<br/>download dos CSVs e consulta à API"]
-        C["similaridade.py<br/>matriz de concordância de votos"]
-        D["gerar_grafo.py<br/>aplica o limiar e escreve o arquivo"]
+    subgraph Pipeline["Pipeline (subsistema offline)"]
+        B["coleta.py<br/>download dos CSVs"]
+        B2["processamento.py<br/>limpeza e filtro de mérito"]
+        C["similaridade.py<br/>concordância de votos"]
+        D["gerar_grafo.py<br/>5 vizinhos mais parecidos"]
     end
 
-    E[("dados/grafo.txt<br/>contrato entre as camadas")]
+    E[("dados/grafo.txt<br/>contrato da aplicação de terminal")]
 
-    subgraph App["Aplicação"]
+    subgraph Terminal["Aplicação de terminal"]
         F["Persistência<br/>persistencia.py"]
         G["Negócio<br/>grafo.py · logica_grafos.py"]
-        H["Apresentação<br/>menu.py · app.py · renderizacao.py"]
+        H["Apresentação<br/>menu.py"]
+    end
+
+    subgraph Web["Versão web (Docker Compose)"]
+        W1["Frontend<br/>Streamlit · porta 8501"]
+        W2["Backend<br/>FastAPI · porta 8000"]
+        W3[("Banco de dados<br/>PostgreSQL 16 · porta 5432")]
     end
 
     Usuario(["Usuário"])
 
-    A --> B --> C --> D --> E
+    A --> B --> B2 --> C --> D --> E
     E --> F --> G --> H --> Usuario
+    Usuario --> W1 -->|HTTP / JSON| W2 -->|SQL| W3
 ```
 
 ### 6.2 Descrição das camadas
 
 | Camada | Módulos | Responsabilidade |
 |---|---|---|
-| **Pipeline** (subsistema offline) | `pipeline/coleta.py`, `pipeline/similaridade.py`, `pipeline/gerar_grafo.py` | Baixar os CSVs, consultar a API de deputados, calcular a similaridade e gerar o arquivo do grafo. Único lugar onde `pandas` e `requests` são utilizados. |
-| **Apresentação** | `src/apresentacao/menu.py`, `src/apresentacao/app.py`, `src/apresentacao/renderizacao.py` | Interação com o usuário, em duas formas: menu de terminal e interface web. |
-| **Negócio** | `src/negocio/grafo.py`, `src/negocio/logica_grafos.py` | Estrutura do grafo (lista de adjacência) e algoritmos de análise, entre eles a conexidade. |
+| **Pipeline** (subsistema offline) | `pipeline/coleta.py`, `pipeline/processamento.py`, `pipeline/similaridade.py`, `pipeline/gerar_grafo.py` | Baixar os CSVs, filtrar as votações de mérito, calcular a concordância entre deputados e gerar o arquivo do grafo. Único lugar onde `pandas` e `numpy` são utilizados. |
+| **Apresentação** | `src/apresentacao/menu.py` (terminal), `src/apresentacao/app.py` (web), `src/apresentacao/renderizacao.py` | Interação com o usuário, em duas formas: menu de terminal e interface web. |
+| **Negócio** | `src/negocio/grafo.py`, `src/negocio/grafoLista.py`, `src/negocio/logica_grafos.py` | Estrutura do grafo (lista de adjacência, a partir da classe apresentada em aula) e algoritmos de análise, entre eles a conexidade. |
+| **API** (versão web) | `src/api/main.py` | Endpoints REST em FastAPI (`/health` e `/deputados`) que consultam o banco e devolvem JSON. |
 | **Persistência** | `src/persistencia/persistencia.py` | Leitura e gravação do arquivo `grafo.txt`, encapsulando o conhecimento do formato. |
-| **Dados** | `dados/grafo.txt` | Armazenamento do grafo em formato texto, versionado no repositório. |
+| **Dados** | `dados/grafo.txt`, banco PostgreSQL (`infra/db/init/01-schema.sql`) | O arquivo guarda o grafo da aplicação de terminal; o banco guarda os dados da versão web. |
 
-A dependência aponta sempre para baixo, e as camadas são fechadas: a apresentação não acessa a persistência diretamente. O ponto de entrada `src/main.py` não pertence a nenhuma camada — monta as peças e inicia a aplicação.
+A dependência aponta sempre para baixo, e as camadas são fechadas: a apresentação não acessa a persistência nem o banco diretamente. Na aplicação de terminal, o ponto de entrada `src/main.py` não pertence a nenhuma camada e apenas monta as peças e inicia a aplicação. Na versão web, o frontend só conversa com a API.
 
-**Fonte externa de dados.** Portal de Dados Abertos da Câmara dos Deputados, combinando os arquivos em lote (`votacoesVotos-{ano}.csv`, `votacoes-{ano}.csv`) para o histórico de votações — um download por ano, em vez de uma requisição por votação — e a API REST (documentada em [dadosabertos.camara.leg.br/swagger/api.html](https://dadosabertos.camara.leg.br/swagger/api.html)) para obter partido e unidade federativa de cada deputado. A investigação exploratória inicial está preservada em [`docs/spikes/`](docs/spikes/).
+**Fonte externa de dados.** Portal de Dados Abertos da Câmara dos Deputados, usando os arquivos em lote (`votacoesVotos-{ano}.csv`, `votacoes-{ano}.csv`, `votacoesObjetos-{ano}.csv` e `votacoesProposicoes-{ano}.csv`) para o histórico de votações, com um download por ano em vez de uma requisição por votação. A investigação exploratória inicial da API REST ([dadosabertos.camara.leg.br/swagger/api.html](https://dadosabertos.camara.leg.br/swagger/api.html)) está preservada em [`docs/spikes/`](docs/spikes/).
 
-**Consequência prática.** A aplicação de terminal não depende de rede, de `pandas` nem de bibliotecas externas de grafos: basta clonar o repositório e executar `python src/main.py`. Se o portal estiver indisponível no momento da demonstração, o comportamento não muda, pois o `grafo.txt` está versionado.
+**Consequência prática.** A aplicação de terminal não depende de rede, de Docker, de `pandas` nem de bibliotecas externas de grafos: basta clonar o repositório e executar `python src/main.py`. Se o portal estiver indisponível no momento da demonstração, o comportamento não muda, pois o `grafo.txt` está versionado. A versão web, por outro lado, exige Docker, que já vem configurado no Codespaces.
+
+**Modelo de dados atual.** Nesta etapa, o banco tem uma única tabela, `app.deputado` (identificador, nome, partido, UF e URL da foto), com dados fictícios de teste. Ela é suficiente para demonstrar o caminho completo entre frontend, backend e banco. Os deputados reais e as concordâncias serão carregados pelo pipeline nas próximas etapas.
 
 ### 6.3 Estrutura de diretórios
 
 ```
 O_Gabinete/
+├── .devcontainer/
+│   └── devcontainer.json       ambiente do GitHub Codespaces
 ├── dados/
 │   ├── brutos/                 CSVs baixados, não versionado
-│   └── grafo.txt              camada de dados
+│   └── grafo.txt               grafo da aplicação de terminal
 ├── docs/
 │   ├── adr/                    registros de decisão
 │   └── spikes/                 investigação descartável
+├── infra/
+│   └── db/init/
+│       └── 01-schema.sql       esquema inicial do banco
 ├── pipeline/                   subsistema offline
+│   ├── utils.py
 │   ├── coleta.py
+│   ├── processamento.py
 │   ├── similaridade.py
 │   └── gerar_grafo.py
 ├── src/
+│   ├── api/                    backend da versão web (FastAPI)
+│   │   └── main.py
 │   ├── apresentacao/           camada de apresentação
-│   │   ├── menu.py
-│   │   ├── app.py
+│   │   ├── menu.py             menu de terminal
+│   │   ├── app.py              interface web (Streamlit)
 │   │   └── renderizacao.py
 │   ├── negocio/                camada de negócio
 │   │   ├── grafo.py
+│   │   ├── grafoLista.py
+│   │   ├── filaCircular.py
 │   │   └── logica_grafos.py
 │   ├── persistencia/           camada de persistência
 │   │   └── persistencia.py
-│   └── main.py                 ponto de entrada
+│   └── main.py                 ponto de entrada do terminal
 ├── tests/
+├── .env.example                modelo das variáveis do banco
+├── docker-compose.yml          orquestração dos containers
 ├── README.md
 └── requirements.txt
 ```
 
-### 6.4 Tecnologias previstas
+### 6.4 Tecnologias
 
 | Categoria | Tecnologia | Onde é usada |
 |---|---|---|
 | Linguagem | Python 3 | todo o projeto |
-| Ingestão e tratamento de dados | `requests`, `pandas` | apenas no pipeline |
+| Ingestão e tratamento de dados | `requests`, `pandas`, `numpy` | apenas no pipeline |
 | Estrutura de grafo | implementação própria (lista de adjacência) | camada de negócio |
 | Interface de terminal | biblioteca padrão | camada de apresentação |
-| Interface web | Streamlit | camada de apresentação |
+| Interface web | Streamlit | frontend da versão web |
+| API | FastAPI, servido por Uvicorn | backend da versão web |
+| Banco de dados | PostgreSQL 16, acessado com `psycopg` | versão web |
+| Containers | Docker e Docker Compose | versão web |
+| Ambiente de desenvolvimento | GitHub Codespaces (`.devcontainer`) | todo o projeto |
 | Renderização do grafo | Pyvis (e NetworkX apenas para cálculo de coordenadas de layout) | camada de apresentação |
 | Testes | pytest | `tests/` |
-| Fonte de dados | Portal de Dados Abertos — Câmara dos Deputados | pipeline |
-| Controle de versão | Git / GitHub | todo o projeto |
+| Fonte de dados | Portal de Dados Abertos da Câmara dos Deputados | pipeline |
+| Controle de versão | Git e GitHub | todo o projeto |
 
 > **Decisão em aberto.** O uso de NetworkX restrito ao cálculo de coordenadas de desenho será confirmado com o professor de Teoria dos Grafos. Caso não seja aceito, a camada de apresentação passa a usar a simulação de física do próprio Pyvis, sem impacto nas demais camadas.
+
+### 6.5 Como executar
+
+**Aplicação de terminal:**
+
+```
+python src/main.py
+```
+
+**Versão web** (no GitHub Codespaces, ou localmente com Docker instalado):
+
+```
+cp .env.example .env
+docker compose up
+```
+
+O frontend fica disponível na porta 8501 e a API na porta 8000 (a rota `/health` confirma que o backend está no ar). No Codespaces, o arquivo `.env` é criado automaticamente na primeira abertura do ambiente.
