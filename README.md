@@ -152,19 +152,19 @@ Protótipos de **baixa fidelidade** (estrutura e navegação, sem esquema de cor
 
 Tela inicial: busca de deputados, filtros (partido, UF, legislatura), área central com o grafo interativo, painel de legenda e estatísticas.
 
-![Wireframe - Tela principal do grafo](assets/wireframes/wireframe-01-grafo-principal.svg)
+![Wireframe - Tela principal do grafo](docs/ihc/wireframes/wireframe-01-grafo-principal.svg)
 
 ### 4.2 Painel de perfil do deputado
 
 Aberto ao clicar em um nó (deputado) do grafo: exibe foto, nome, partido/UF, resumo de votações e ações rápidas (comparar, ver perfil completo).
 
-![Wireframe - Painel de perfil do deputado](assets/wireframes/wireframe-02-perfil-deputado.svg)
+![Wireframe - Painel de perfil do deputado](docs/ihc/wireframes/wireframe-02-perfil-deputado.svg)
 
 ### 4.3 Tela de comparação entre dois deputados
 
 Exibe os dois perfis lado a lado, o percentual de similaridade calculado e a lista de proposições em que os votos convergiram ou divergiram.
 
-![Wireframe - Tela de comparação](assets/wireframes/wireframe-03-comparacao.svg)
+![Wireframe - Tela de comparação](docs/ihc/wireframes/wireframe-03-comparacao.svg)
 
 ---
 
@@ -294,17 +294,17 @@ flowchart TB
 | Camada | Módulos | Responsabilidade |
 |---|---|---|
 | **Pipeline** (subsistema offline) | `pipeline/coleta.py`, `pipeline/processamento.py`, `pipeline/similaridade.py`, `pipeline/gerar_grafo.py` | Baixar os CSVs, filtrar as votações de mérito, calcular a concordância entre deputados e gerar o arquivo do grafo. Único lugar onde `pandas` e `numpy` são utilizados. |
-| **Apresentação** | `src/apresentacao/menu.py` (terminal), `src/apresentacao/app.py` (web), `src/apresentacao/renderizacao.py` | Interação com o usuário, em duas formas: menu de terminal e interface web. |
-| **Negócio** | `src/negocio/grafo.py`, `src/negocio/grafoLista.py`, `src/negocio/logica_grafos.py` | Estrutura do grafo (lista de adjacência, a partir da classe apresentada em aula) e algoritmos de análise, entre eles a conexidade. |
-| **API** (versão web) | `src/api/main.py` | Endpoints REST em FastAPI (`/health` e `/deputados`) que consultam o banco e devolvem JSON. |
-| **Persistência** | `src/persistencia/persistencia.py` | Leitura e gravação do arquivo `grafo.txt`, encapsulando o conhecimento do formato. |
+| **Apresentação** | `grafos/apresentacao/menu.py` (terminal), `web/frontend/app.py` (web) | Interação com o usuário, em duas formas: menu de terminal e interface web. |
+| **Negócio** | `grafos/negocio/grafo.py`, `grafos/negocio/grafoLista.py`, `grafos/negocio/logica_grafos.py` | Estrutura do grafo (lista de adjacência, a partir da classe apresentada em aula) e algoritmos de análise, entre eles a conexidade. |
+| **API** (versão web) | `web/api/main.py` | Endpoints REST em FastAPI (`/health` e `/deputados`) que consultam o banco e devolvem JSON. |
+| **Persistência** | `grafos/persistencia/persistencia.py` | Leitura e gravação do arquivo `grafo.txt`, encapsulando o conhecimento do formato. |
 | **Dados** | `dados/grafo.txt`, banco PostgreSQL (`infra/db/init/01-schema.sql`) | O arquivo guarda o grafo da aplicação de terminal; o banco guarda os dados da versão web. |
 
-A dependência aponta sempre para baixo, e as camadas são fechadas: a apresentação não acessa a persistência nem o banco diretamente. Na aplicação de terminal, o ponto de entrada `src/main.py` não pertence a nenhuma camada e apenas monta as peças e inicia a aplicação. Na versão web, o frontend só conversa com a API.
+A dependência aponta sempre para baixo, e as camadas são fechadas: a apresentação não acessa a persistência nem o banco diretamente. Na aplicação de terminal, o ponto de entrada `grafos/main.py` não pertence a nenhuma camada e apenas monta as peças e inicia a aplicação. Na versão web, o frontend só conversa com a API.
 
 **Fonte externa de dados.** Portal de Dados Abertos da Câmara dos Deputados, usando os arquivos em lote (`votacoesVotos-{ano}.csv`, `votacoes-{ano}.csv`, `votacoesObjetos-{ano}.csv` e `votacoesProposicoes-{ano}.csv`) para o histórico de votações, com um download por ano em vez de uma requisição por votação. A investigação exploratória inicial da API REST ([dadosabertos.camara.leg.br/swagger/api.html](https://dadosabertos.camara.leg.br/swagger/api.html)) está preservada em [`docs/spikes/`](docs/spikes/).
 
-**Consequência prática.** A aplicação de terminal não depende de rede, de Docker, de `pandas` nem de bibliotecas externas de grafos: basta clonar o repositório e executar `python src/main.py`. Se o portal estiver indisponível no momento da demonstração, o comportamento não muda, pois o `grafo.txt` está versionado. A versão web, por outro lado, exige Docker, que já vem configurado no Codespaces.
+**Consequência prática.** A aplicação de terminal não depende de rede, de Docker, de `pandas` nem de bibliotecas externas de grafos: basta clonar o repositório e executar `python grafos/main.py`. Se o portal estiver indisponível no momento da demonstração, o comportamento não muda, pois o `grafo.txt` está versionado. A versão web, por outro lado, exige Docker, que já vem configurado no Codespaces.
 
 **Modelo de dados atual.** Nesta etapa, o banco tem uma única tabela, `app.deputado` (identificador, nome, partido, UF e URL da foto), com dados fictícios de teste. Ela é suficiente para demonstrar o caminho completo entre frontend, backend e banco. Os deputados reais e as concordâncias serão carregados pelo pipeline nas próximas etapas.
 
@@ -319,7 +319,22 @@ O_Gabinete/
 │   └── grafo.txt               grafo da aplicação de terminal
 ├── docs/
 │   ├── adr/                    registros de decisão
+│   ├── engsoft/                relatório de Engenharia de Software
+│   ├── grafos/                 relatório, apresentação e grafo em GEXF
+│   ├── ihc/
+│   │   └── wireframes/         protótipos de baixa fidelidade
 │   └── spikes/                 investigação descartável
+├── grafos/                     aplicação de terminal
+│   ├── apresentacao/           camada de apresentação
+│   │   └── menu.py             menu de terminal
+│   ├── negocio/                camada de negócio
+│   │   ├── grafo.py
+│   │   ├── grafoLista.py
+│   │   ├── filaCircular.py
+│   │   └── logica_grafos.py
+│   ├── persistencia/           camada de persistência
+│   │   └── persistencia.py
+│   └── main.py                 ponto de entrada do terminal
 ├── infra/
 │   └── db/init/
 │       └── 01-schema.sql       esquema inicial do banco
@@ -329,22 +344,12 @@ O_Gabinete/
 │   ├── processamento.py
 │   ├── similaridade.py
 │   └── gerar_grafo.py
-├── src/
+├── tests/
+├── web/
 │   ├── api/                    backend da versão web (FastAPI)
 │   │   └── main.py
-│   ├── apresentacao/           camada de apresentação
-│   │   ├── menu.py             menu de terminal
-│   │   ├── app.py              interface web (Streamlit)
-│   │   └── renderizacao.py
-│   ├── negocio/                camada de negócio
-│   │   ├── grafo.py
-│   │   ├── grafoLista.py
-│   │   ├── filaCircular.py
-│   │   └── logica_grafos.py
-│   ├── persistencia/           camada de persistência
-│   │   └── persistencia.py
-│   └── main.py                 ponto de entrada do terminal
-├── tests/
+│   └── frontend/               interface web (Streamlit)
+│       └── app.py
 ├── .env.example                modelo das variáveis do banco
 ├── docker-compose.yml          orquestração dos containers
 ├── README.md
@@ -376,7 +381,7 @@ O_Gabinete/
 **Aplicação de terminal:**
 
 ```
-python src/main.py
+python grafos/main.py
 ```
 
 **Versão web** (no GitHub Codespaces, ou localmente com Docker instalado):

@@ -16,25 +16,25 @@ services:
       retries: 10
 
   backend:
-    build: ./src/api
+    build: ./web/api
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@database:5432/${POSTGRES_DB}
     ports:
       - "8000:8000"
     volumes:
-      - ./src/api:/app
+      - ./web/api:/app
     depends_on:
       database:
         condition: service_healthy
 
   frontend:
-    build: ./src/apresentacao
+    build: ./web/frontend
     environment:
       API_URL: http://backend:8000
     ports:
       - "8501:8501"
     volumes:
-      - ./src/apresentacao:/app
+      - ./web/frontend:/app
     depends_on:
       - backend
 

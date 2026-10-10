@@ -32,22 +32,23 @@ O_Gabinete/
 ├── docs/
 │   ├── adr/                    registros de decisão
 │   └── spikes/                 investigação descartável
-├── pipeline/                   subsistema offline
-│   ├── coleta.py
-│   ├── similaridade.py
-│   └── gerar_grafo.py
-├── src/
+├── grafos/
 │   ├── apresentacao/           camada de apresentação
-│   │   ├── menu.py
-│   │   ├── app.py
-│   │   └── renderizacao.py
+│   │   └── menu.py
 │   ├── negocio/                camada de negócio
 │   │   ├── grafo.py
 │   │   └── logica_grafos.py
 │   ├── persistencia/           camada de persistência
 │   │   └── persistencia.py
 │   └── main.py                 ponto de entrada
+├── pipeline/                   subsistema offline
+│   ├── coleta.py
+│   ├── similaridade.py
+│   └── gerar_grafo.py
 ├── tests/
+├── web/
+│   └── frontend/
+│       └── app.py
 ├── README.md
 └── requirements.txt
 ```
@@ -55,12 +56,12 @@ O_Gabinete/
 | Camada | Módulo | Responsabilidade |
 |---|---|---|
 | Pipeline (subsistema offline) | `pipeline/coleta.py`, `pipeline/similaridade.py`, `pipeline/gerar_grafo.py` | Baixar os CSVs, consultar a API, calcular similaridade, gerar o arquivo |
-| Apresentação | `src/apresentacao/menu.py`, `src/apresentacao/app.py`, `src/apresentacao/renderizacao.py` | Interação com o usuário |
-| Negócio | `src/negocio/grafo.py`, `src/negocio/logica_grafos.py` | Estrutura do grafo e algoritmos |
-| Persistência | `src/persistencia/persistencia.py` | Leitura e gravação do `grafos.txt` |
+| Apresentação | `grafos/apresentacao/menu.py`, `web/frontend/app.py` | Interação com o usuário |
+| Negócio | `grafos/negocio/grafo.py`, `grafos/negocio/logica_grafos.py` | Estrutura do grafo e algoritmos |
+| Persistência | `grafos/persistencia/persistencia.py` | Leitura e gravação do `grafos.txt` |
 | Dados | `dados/grafos.txt` | Armazenamento |
 
-`src/main.py` é o ponto de entrada e não pertence a nenhuma camada: monta as
+`grafos/main.py` é o ponto de entrada e não pertence a nenhuma camada: monta as
 peças e inicia a aplicação. Os arquivos em `docs/spikes/` também ficam fora das
 camadas — são código descartável de investigação, preservado como evidência das
 decisões tomadas, e nada no sistema os importa. `tests/` fica igualmente fora:
@@ -70,6 +71,6 @@ A dependência aponta sempre para baixo. As camadas são fechadas: a apresentaç
 não acessa a persistência diretamente.
 
 Pandas existe somente no pipeline. Streamlit, Pyvis e NetworkX existem somente
-em `src/apresentacao/`; as camadas de negócio e persistência usam apenas a
+em `web/frontend/`; as camadas de negócio e persistência usam apenas a
 biblioteca padrão do Python, de modo que a aplicação de terminal continua
 executável sem instalar dependências externas.
