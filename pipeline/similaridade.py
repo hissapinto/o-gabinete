@@ -19,6 +19,8 @@ Historico de alteracoes:
     25/09/2026 - Kaique - Calculo da matriz de similaridade por cosseno.
     26/09/2026 - Kaique - Metrica trocada para percentual de votos
                           coincidentes, calculado so nas votacoes em comum.
+    14/10/2026 - Kaique - Contadores de cada par (votacoes em comum e
+                          concordancias) separados, para a carga no banco.
 """
 
 import numpy as np
@@ -40,25 +42,65 @@ def matriz_de_votos(df_votos):
     return matriz[(matriz != 0).any(axis=1)]
 
 
-def concordancia(matriz, minimo_em_comum=MINIMO_VOTACOES_EM_COMUM):
+def contar_pares(matriz):
     """
-    Percentual de votos coincidentes (0 a 100) entre cada par de deputados,
-    contando só as votações em que os dois votaram. Como os votos valem +1 ou -1,
-    M @ M.T dá (concordâncias - discordâncias) e votou @ votou.T dá o total em comum.
-    Pares com menos de minimo_em_comum votações em comum e a diagonal ficam NaN.
+    Contadores de cada par de deputados, só nas votações em que os dois votaram.
+    Devolve duas matrizes deputado x deputado:
+    - em_comum: total de votações em comum (votou @ votou.T);
+    - saldo: concordâncias - discordâncias (M @ M.T, já que os votos valem +1 ou -1).
     """
     M = matriz.to_numpy(dtype=float)
 
     votou = (M != 0).astype(float)
     em_comum = votou @ votou.T
+    saldo = M @ M.T
 
+    return em_comum, saldo
+
+
+def concordancia(matriz, minimo_em_comum=MINIMO_VOTACOES_EM_COMUM):
+    """
+    Percentual de votos coincidentes (0 a 100) entre cada par de deputados,
+    contando só as votações em que os dois votaram (ver contar_pares).
+    Pares com menos de minimo_em_comum votações em comum e a diagonal ficam NaN.
+    """
+    em_comum, saldo = contar_pares(matriz)
+
+    # A conta tem que ficar exatamente assim: qualquer outra forma pode mudar a
+    # última casa do float e, com ela, o arredondamento dos pesos no grafo.txt.
     with np.errstate(divide='ignore', invalid='ignore'):
-        C = ((M @ M.T) / em_comum + 1) / 2 * 100
+        C = (saldo / em_comum + 1) / 2 * 100
 
     C[em_comum < minimo_em_comum] = np.nan
     np.fill_diagonal(C, np.nan)
 
     return pd.DataFrame(C, index=matriz.index, columns=matriz.index)
+
+
+def pares_com_concordancia(matriz, minimo_em_comum=MINIMO_VOTACOES_EM_COMUM):
+    """
+    Uma linha por par de deputados com pelo menos minimo_em_comum votações em
+    comum: o total de votações em comum e em quantas delas os dois votaram igual.
+    Cada par aparece uma vez, sempre com o menor deputado_id em deputado_a.
+    """
+    em_comum, saldo = contar_pares(matriz)
+    ids = matriz.index.to_numpy()
+
+    linhas = []
+    for i in range(len(ids)):
+        for j in range(i + 1, len(ids)):
+            votacoes_em_comum = int(em_comum[i, j])
+            if votacoes_em_comum >= minimo_em_comum:
+                # iguais + diferentes = em_comum e iguais - diferentes = saldo,
+                # então iguais = (em_comum + saldo) / 2
+                concordancias = (votacoes_em_comum + int(saldo[i, j])) // 2
+                deputado_a = min(int(ids[i]), int(ids[j]))
+                deputado_b = max(int(ids[i]), int(ids[j]))
+                linhas.append((deputado_a, deputado_b, votacoes_em_comum, concordancias))
+
+    colunas = ['deputado_a', 'deputado_b', 'votacoes_em_comum', 'concordancias']
+    pares = pd.DataFrame(linhas, columns=colunas)
+    return pares
 
 
 if __name__ == "__main__":
