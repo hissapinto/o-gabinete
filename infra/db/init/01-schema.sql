@@ -63,15 +63,19 @@ CREATE TABLE app.execucao (
 );
 
 -- Concordancia de todos os pares validos. Cada par aparece uma vez,
--- sempre com o menor id em deputado_a.
+-- sempre com o menor id em deputado_a. O percentual e calculado pelo
+-- proprio banco a partir dos contadores, para os dois nunca divergirem.
 CREATE TABLE app.concordancia (
     execucao_id       INTEGER REFERENCES app.execucao (execucao_id) ON DELETE CASCADE,
     deputado_a        INTEGER REFERENCES app.deputado (deputado_id),
     deputado_b        INTEGER REFERENCES app.deputado (deputado_id),
-    percentual        NUMERIC(5, 2) NOT NULL CHECK (percentual BETWEEN 0 AND 100),
-    votacoes_em_comum INTEGER NOT NULL,
+    votacoes_em_comum INTEGER NOT NULL,           -- votacoes em que os dois votaram
+    concordancias     INTEGER NOT NULL,           -- dessas, em quantas votaram igual
+    percentual        NUMERIC(5, 2) GENERATED ALWAYS AS (concordancias * 100.0 / votacoes_em_comum) STORED
+                      CHECK (percentual BETWEEN 0 AND 100),
     PRIMARY KEY (execucao_id, deputado_a, deputado_b),
-    CHECK (deputado_a < deputado_b)
+    CHECK (deputado_a < deputado_b),
+    CHECK (concordancias <= votacoes_em_comum)
 );
 
 -- Arestas do grafo final (os k vizinhos mais parecidos de cada deputado).
