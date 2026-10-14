@@ -6,6 +6,8 @@ import psycopg
 from utils import RAIZ
 from coleta import ANO_REFERENCIA, baixar_dados_brutos
 from processamento import ler_csv_camara, votacoes_de_merito
+from similaridade import MINIMO_VOTACOES_EM_COMUM, matriz_de_votos, concordancia, pares_com_concordancia
+from gerar_grafo import K_VIZINHOS, CONCORDANCIA_MINIMA, descartar_sem_par, montar_rotulos, montar_grafo
 
 
 def ler_configuracao():
@@ -68,6 +70,32 @@ def votos_das_votacoes(df_votos, ids):
     """Voto de cada deputado, com o partido que ele tinha no dia."""
     df = df_votos[df_votos['idVotacao'].isin(ids)]
     return sem_nulos(df[['idVotacao', 'deputado_id', 'voto', 'deputado_siglaPartido']])
+
+
+def calcular_resultados(df_votos, ids, deputados):
+    """
+    Concordancia de todos os pares validos e arestas do grafo, pelas regras do
+    similaridade.py e do gerar_grafo.py. As arestas passam pelo montar_grafo,
+    na mesma ordem de vertices do grafo.txt, para o banco ter as mesmas arestas.
+    Os pares vem sempre com o menor deputado_id em deputado_a.
+    """
+    matriz = matriz_de_votos(df_votos[df_votos['idVotacao'].isin(ids)])
+    pares = pares_com_concordancia(matriz)
+
+    C = concordancia(matriz).to_numpy()
+    ids_grafo, C, descartados = descartar_sem_par(matriz.index.to_numpy(), C)
+    rotulos = montar_rotulos(ids_grafo, deputados)
+    ids_grafo, rotulos, arestas_por_vertice = montar_grafo(ids_grafo, C, rotulos)
+
+    # o grafo usa a posicao do vertice; o banco usa o deputado_id real
+    linhas = []
+    for (v, w), peso in arestas_por_vertice.items():
+        deputado_a = min(ids_grafo[v], ids_grafo[w])
+        deputado_b = max(ids_grafo[v], ids_grafo[w])
+        linhas.append((deputado_a, deputado_b, peso))
+    arestas = pd.DataFrame(linhas, columns=['deputado_a', 'deputado_b', 'peso'])
+
+    return pares, arestas
 
 
 def carregar_deputados(conexao, df):
@@ -151,6 +179,32 @@ def atualizar_partido_atual(conexao):
         return cursor.rowcount
 
 
+def carregar_resultados(conexao, pares, arestas):
+    """
+    Cria uma execucao nova do ano, com os parametros usados, e grava a
+    concordancia dos pares e as arestas dela. As execucoes antigas ficam
+    guardadas: rodar a carga de novo cria outra, sem apagar nada.
+    """
+    with conexao.cursor() as cursor:
+        cursor.execute(
+            """
+            INSERT INTO app.execucao (ano_inicio, ano_fim, minimo_votacoes_em_comum,
+                                      k_vizinhos, concordancia_minima)
+            VALUES (%s, %s, %s, %s, %s)
+            RETURNING execucao_id
+            """,
+            (ANO_REFERENCIA, ANO_REFERENCIA, MINIMO_VOTACOES_EM_COMUM, K_VIZINHOS, CONCORDANCIA_MINIMA),
+        )
+        execucao_id = cursor.fetchone()[0]
+
+        # O percentual nao entra no COPY: o banco calcula a partir dos contadores.
+        copiar(cursor, 'COPY app.concordancia (deputado_a, deputado_b, votacoes_em_comum, concordancias, '
+                       'execucao_id) FROM STDIN', pares.assign(execucao_id=execucao_id))
+        copiar(cursor, 'COPY app.aresta (deputado_a, deputado_b, peso, execucao_id) FROM STDIN',
+               arestas.assign(execucao_id=execucao_id))
+    return execucao_id
+
+
 if __name__ == "__main__":
     pasta_brutos = baixar_dados_brutos()
     df_votos = ler_csv_camara(pasta_brutos / f'votacoesVotos-{ANO_REFERENCIA}.csv')
@@ -160,6 +214,7 @@ if __name__ == "__main__":
     votacoes = votacoes_do_ano(pasta_brutos, ids)
     proposicoes, vinculos = proposicoes_das_votacoes(pasta_brutos, ids)
     votos = votos_das_votacoes(df_votos, ids)
+    pares, arestas = calcular_resultados(df_votos, ids, deputados)
 
     # Uma transacao so: se qualquer etapa falhar, o banco fica como estava.
     # A ordem respeita as chaves estrangeiras.
@@ -168,7 +223,9 @@ if __name__ == "__main__":
         total_proposicoes = carregar_proposicoes(conexao, proposicoes)
         total_votacoes, total_votos = carregar_votacoes(conexao, votacoes, vinculos, votos)
         partidos_corrigidos = atualizar_partido_atual(conexao)
+        execucao_id = carregar_resultados(conexao, pares, arestas)
 
     print(f'{ANO_REFERENCIA}: {total_deputados} deputados, {total_proposicoes} proposicoes, '
           f'{total_votacoes} votacoes de merito e {total_votos} votos gravados no banco.')
     print(f'{partidos_corrigidos} deputados com o partido atual recalculado pelos votos.')
+    print(f'Execucao {execucao_id}: {len(pares)} pares com concordancia e {len(arestas)} arestas gravados.')
