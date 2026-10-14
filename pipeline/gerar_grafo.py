@@ -22,6 +22,8 @@ Historico de alteracoes:
     10/09/2026 - Isabela - Criacao do arquivo na estrutura inicial do projeto.
     26/09/2026 - Kaique - Geracao do grafo.txt (k vizinhos mais parecidos,
                           concordancia minima e ordenacao alfabetica).
+    14/10/2026 - Kaique - Leitura dos arquivos separada da montagem do grafo,
+                          para a carga no banco gerar as mesmas arestas.
 """
 
 import unicodedata
@@ -35,20 +37,35 @@ K_VIZINHOS = 5
 CONCORDANCIA_MINIMA = 75  # em %, a confirmar com o professor
 
 
-def carregar_concordancia(pasta):
-    """Le a matriz e descarta deputados sem nenhum par valido."""
-    df = pd.read_csv(pasta / f'similaridade-{ANO_REFERENCIA}.csv', index_col=0)
-    ids = df.index.to_numpy()
-    C = df.to_numpy(dtype=float)
+def descartar_sem_par(ids, C):
+    """
+    Tira da matriz os deputados sem nenhum par valido (linha toda NaN).
+    Devolve os ids que ficam, a matriz reduzida e quantos foram descartados.
+    """
+    C = np.array(C, dtype=float)  # copia: a matriz recebida nao e alterada
     np.fill_diagonal(C, np.nan)
 
     com_par = ~np.isnan(C).all(axis=1)
-    return ids[com_par], C[np.ix_(com_par, com_par)], int((~com_par).sum())
+    ids_com_par = ids[com_par]
+    C_com_par = C[np.ix_(com_par, com_par)]
+    descartados = int((~com_par).sum())
+
+    return ids_com_par, C_com_par, descartados
 
 
-def montar_rotulos(ids, pasta):
-    """Rotulo do vertice no formato 'Nome (PARTIDO-UF)'."""
-    dep = pd.read_csv(pasta / 'deputados.csv').set_index('deputado_id')
+def carregar_concordancia(pasta):
+    """Le a matriz salva pelo similaridade.py e descarta deputados sem nenhum par valido."""
+    df = pd.read_csv(pasta / f'similaridade-{ANO_REFERENCIA}.csv', index_col=0)
+    ids, C, descartados = descartar_sem_par(df.index.to_numpy(), df.to_numpy(dtype=float))
+    return ids, C, descartados
+
+
+def montar_rotulos(ids, deputados):
+    """
+    Rotulo do vertice no formato 'Nome (PARTIDO-UF)'. deputados e um DataFrame com
+    deputado_id, deputado_nome, deputado_siglaPartido e deputado_siglaUf.
+    """
+    dep = deputados.set_index('deputado_id')
     rotulos = []
     for i in ids:
         nome = str(dep.at[i, 'deputado_nome']).replace('"', "'")
@@ -74,6 +91,27 @@ def escolher_arestas(C, k=K_VIZINHOS, minimo=CONCORDANCIA_MINIMA):
     return arestas
 
 
+def montar_grafo(ids, C, rotulos):
+    """
+    Coloca os vertices em ordem alfabetica e escolhe as arestas.
+    A ordem importa: nos empates de concordancia, escolher_arestas desempata pela
+    posicao do vertice. Por isso o grafo.txt e o banco passam os dois por aqui.
+    Devolve ids e rotulos na ordem dos vertices e as arestas {(v, w): peso}.
+    """
+    ordem = sorted(range(len(rotulos)), key=lambda i: chave_alfabetica(rotulos[i]))
+
+    ids_ordenados = []
+    rotulos_ordenados = []
+    for i in ordem:
+        ids_ordenados.append(int(ids[i]))
+        rotulos_ordenados.append(rotulos[i])
+
+    C_ordenada = C[np.ix_(ordem, ordem)]
+    arestas = escolher_arestas(C_ordenada)
+
+    return ids_ordenados, rotulos_ordenados, arestas
+
+
 def gravar_grafo(caminho, rotulos, arestas):
     """Grava no mesmo formato lido pela opcao (a) do menu."""
     with open(caminho, 'w', encoding='utf-8') as arquivo:
@@ -88,14 +126,10 @@ def gravar_grafo(caminho, rotulos, arestas):
 if __name__ == "__main__":
     pasta = RAIZ / 'dados' / 'processado'
     ids, C, descartados = carregar_concordancia(pasta)
-    rotulos = montar_rotulos(ids, pasta)
+    rotulos = montar_rotulos(ids, pd.read_csv(pasta / 'deputados.csv'))
 
     # vertices em ordem alfabetica, para facilitar a leitura do arquivo
-    ordem = sorted(range(len(rotulos)), key=lambda i: chave_alfabetica(rotulos[i]))
-    C = C[np.ix_(ordem, ordem)]
-    rotulos = [rotulos[i] for i in ordem]
-
-    arestas = escolher_arestas(C)
+    ids, rotulos, arestas = montar_grafo(ids, C, rotulos)
     grau = np.zeros(len(rotulos), dtype=int)
     for v, w in arestas:
         grau[v] += 1
