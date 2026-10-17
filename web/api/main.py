@@ -1,6 +1,6 @@
 """
 O Gabinete - Mapa de Similaridade Politica entre Deputados Federais
-Arquivo: src/api/main.py
+Arquivo: web/api/main.py
 
 Integrantes:
     Caio Ariel Cardoso Saraiva  - RA 10439611
@@ -8,31 +8,30 @@ Integrantes:
     Kaique Barros Paiva         - RA 10441787
 
 Sintese:
-    API em FastAPI que liga a interface ao banco PostgreSQL. Expoe a rota
-    /health, que confirma que o servico esta no ar, e a rota /deputados,
-    que lista os deputados cadastrados na camada de dados.
+    API em FastAPI que liga a interface ao banco PostgreSQL. Cria a aplicacao,
+    registra os routers de cada recurso e mantem as rotas /health e
+    /deputados do Hello World.
 
 Historico de alteracoes:
     25/09/2026 - Caio - Criacao do Hello World atravessando as tres camadas.
+    17/10/2026 - Caio - Conexao movida para banco.py e inclusao do router /anos.
 """
-
-import os
 
 import psycopg
 from fastapi import FastAPI, HTTPException
-from psycopg.rows import dict_row
+
+from banco import conectar
+from rotas.anos import router as anos_router
 
 app = FastAPI(title="O Gabinete - API")
+app.include_router(anos_router)
 
-DATABASE_URL = os.environ["DATABASE_URL"]
-
-def conectar():
-    return psycopg.connect(DATABASE_URL, row_factory=dict_row)
 
 @app.get("/health")
 def health():
     """Confirma que a API esta no ar, sem tocar no banco."""
     return {"status": "ok", "servico": "backend"}
+
 
 @app.get("/deputados")
 def listar_deputados():
