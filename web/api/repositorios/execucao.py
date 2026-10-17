@@ -13,6 +13,7 @@ Sintese:
 
 Historico de alteracoes:
     17/10/2026 - Caio - Criacao, com a listagem dos anos disponiveis.
+    17/10/2026 - Caio - Busca da execucao mais recente de um ano.
 """
 
 
@@ -31,3 +32,23 @@ def listar_anos_disponiveis(conexao):
             """
         )
         return cursor.fetchall()
+
+
+def buscar_execucao_mais_recente(conexao, ano):
+    """
+    Id da execucao mais recente do ano, ou None se o ano nao tem nenhuma.
+    O execucao_id e SERIAL e so cresce, entao o maior id e o mais recente.
+    """
+    with conexao.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT execucao_id
+            FROM app.execucao
+            WHERE ano_inicio = %(ano)s AND ano_fim = %(ano)s
+            ORDER BY execucao_id DESC
+            LIMIT 1
+            """,
+            {"ano": ano},
+        )
+        linha = cursor.fetchone()
+    return linha["execucao_id"] if linha else None

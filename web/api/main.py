@@ -13,8 +13,9 @@ Sintese:
     /deputados do Hello World.
 
 Historico de alteracoes:
-    25/09/2026 - Caio - Criacao do Hello World atravessando as tres camadas.
-    17/10/2026 - Caio - Conexao movida para banco.py e inclusao do router /anos.
+      25/09/2026 - Caio - Criacao do Hello World atravessando as tres camadas.
+      17/10/2026 - Caio - Conexao movida para banco.py e inclusao do router /anos.
+      17/10/2026 - Caio - Inclusao do router de concordancias.
 """
 
 import psycopg
@@ -22,10 +23,11 @@ from fastapi import FastAPI, HTTPException
 
 from banco import conectar
 from rotas.anos import router as anos_router
+from rotas.concordancias import router as concordancias_router
 
 app = FastAPI(title="O Gabinete - API")
 app.include_router(anos_router)
-
+app.include_router(concordancias_router)
 
 @app.get("/health")
 def health():
