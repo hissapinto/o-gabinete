@@ -266,6 +266,7 @@ flowchart TB
         B2["processamento.py<br/>limpeza e filtro de mérito"]
         C["similaridade.py<br/>concordância de votos"]
         D["gerar_grafo.py<br/>5 vizinhos mais parecidos"]
+        I["carga.py<br/>reusa as regras e grava no banco"]
     end
 
     E[("dados/grafo.txt<br/>contrato da aplicação de terminal")]
@@ -285,6 +286,7 @@ flowchart TB
     Usuario(["Usuário"])
 
     A --> B --> B2 --> C --> D --> E
+    D --> I --> W3
     E --> F --> G --> H --> Usuario
     Usuario --> W1 -->|HTTP / JSON| W2 -->|SQL| W3
 ```
@@ -293,10 +295,10 @@ flowchart TB
 
 | Camada | Módulos | Responsabilidade |
 |---|---|---|
-| **Pipeline** (subsistema offline) | `pipeline/coleta.py`, `pipeline/processamento.py`, `pipeline/similaridade.py`, `pipeline/gerar_grafo.py` | Baixar os CSVs, filtrar as votações de mérito, calcular a concordância entre deputados e gerar o arquivo do grafo. Único lugar onde `pandas` e `numpy` são utilizados. |
+| **Pipeline** (subsistema offline) | `pipeline/coleta.py`, `pipeline/processamento.py`, `pipeline/similaridade.py`, `pipeline/gerar_grafo.py`, `pipeline/carga.py` | Baixar os CSVs, filtrar as votações de mérito, calcular a concordância entre deputados, gerar o arquivo do grafo e carregar o banco da versão web. Único lugar onde `pandas` e `numpy` são utilizados. |
 | **Apresentação** | `grafos/apresentacao/menu.py` (terminal), `web/frontend/app.py` (web) | Interação com o usuário, em duas formas: menu de terminal e interface web. |
 | **Negócio** | `grafos/negocio/grafo.py`, `grafos/negocio/grafoLista.py`, `grafos/negocio/logica_grafos.py` | Estrutura do grafo (lista de adjacência, a partir da classe apresentada em aula) e algoritmos de análise, entre eles a conexidade. |
-| **API** (versão web) | `web/api/main.py` | Endpoints REST em FastAPI (`/health` e `/deputados`) que consultam o banco e devolvem JSON. |
+| **API** (versão web) | `web/api/` (`main.py`, `banco.py`, `rotas/`, `servicos/`, `repositorios/`) | Endpoints REST em FastAPI. Dividida internamente: `rotas/` recebe o HTTP, `servicos/` aplica a regra de negócio, `repositorios/` executa o SQL e `banco.py` é o único módulo que conhece a `DATABASE_URL`. |
 | **Persistência** | `grafos/persistencia/persistencia.py` | Leitura e gravação do arquivo `grafo.txt`, encapsulando o conhecimento do formato. |
 | **Dados** | `dados/grafo.txt`, banco PostgreSQL (`infra/db/init/01-schema.sql`) | O arquivo guarda o grafo da aplicação de terminal; o banco guarda os dados da versão web. |
 
@@ -306,7 +308,7 @@ A dependência aponta sempre para baixo, e as camadas são fechadas: a apresenta
 
 **Consequência prática.** A aplicação de terminal não depende de rede, de Docker, de `pandas` nem de bibliotecas externas de grafos: basta clonar o repositório e executar `python grafos/main.py`. Se o portal estiver indisponível no momento da demonstração, o comportamento não muda, pois o `grafo.txt` está versionado. A versão web, por outro lado, exige Docker, que já vem configurado no Codespaces.
 
-**Modelo de dados atual.** Nesta etapa, o banco tem uma única tabela, `app.deputado` (identificador, nome, partido, UF e URL da foto), com dados fictícios de teste. Ela é suficiente para demonstrar o caminho completo entre frontend, backend e banco. Os deputados reais e as concordâncias serão carregados pelo pipeline nas próximas etapas.
+**Modelo de dados atual.** O banco tem oito tabelas, divididas em dois blocos. Os dados da Câmara ficam em `deputado`, `proposicao`, `votacao`, `votacao_proposicao` e `voto`; os resultados do pipeline, em `execucao`, `concordancia` e `aresta`. Cada execução do `carga.py` registra em `app.execucao` os parâmetros usados (ano, mínimo de votações em comum, número de vizinhos e concordância mínima), de modo que versões diferentes do grafo podem conviver no banco e ser comparadas. As arestas gravadas são as mesmas do `grafo.txt`, porque a carga passa pelas funções do `similaridade.py` e do `gerar_grafo.py`.
 
 ### 6.3 Estrutura de diretórios
 
@@ -343,11 +345,16 @@ O_Gabinete/
 │   ├── coleta.py
 │   ├── processamento.py
 │   ├── similaridade.py
-│   └── gerar_grafo.py
+│   ├── gerar_grafo.py
+│   └── carga.py                carga do banco da versão web
 ├── tests/
 ├── web/
 │   ├── api/                    backend da versão web (FastAPI)
-│   │   └── main.py
+│   │   ├── main.py             cria a aplicação e registra os routers
+│   │   ├── banco.py            conexão com o PostgreSQL
+│   │   ├── rotas/              endpoints HTTP
+│   │   ├── servicos/           regras de negócio
+│   │   └── repositorios/       consultas SQL
 │   └── frontend/               interface web (Streamlit)
 │       └── app.py
 ├── .env.example                modelo das variáveis do banco
@@ -369,12 +376,9 @@ O_Gabinete/
 | Banco de dados | PostgreSQL 16, acessado com `psycopg` | versão web |
 | Containers | Docker e Docker Compose | versão web |
 | Ambiente de desenvolvimento | GitHub Codespaces (`.devcontainer`) | todo o projeto |
-| Renderização do grafo | Pyvis (e NetworkX apenas para cálculo de coordenadas de layout) | camada de apresentação |
 | Testes | pytest | `tests/` |
 | Fonte de dados | Portal de Dados Abertos da Câmara dos Deputados | pipeline |
 | Controle de versão | Git e GitHub | todo o projeto |
-
-> **Decisão em aberto.** O uso de NetworkX restrito ao cálculo de coordenadas de desenho será confirmado com o professor de Teoria dos Grafos. Caso não seja aceito, a camada de apresentação passa a usar a simulação de física do próprio Pyvis, sem impacto nas demais camadas.
 
 ### 6.5 Como executar
 
@@ -392,3 +396,11 @@ docker compose up
 ```
 
 O frontend fica disponível na porta 8501 e a API na porta 8000 (a rota `/health` confirma que o backend está no ar). No Codespaces, o arquivo `.env` é criado automaticamente na primeira abertura do ambiente.
+
+**Carga dos dados no banco** (com os containers no ar, a partir da pasta `pipeline/`):
+
+```
+python carga.py
+```
+
+O script baixa os CSVs do ano de referência, filtra as votações de mérito, calcula a concordância entre os deputados e grava tudo no banco em uma única transação. Rodar de novo não duplica os dados: as votações do ano são substituídas, e uma execução nova é registrada em `app.execucao`.

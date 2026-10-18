@@ -217,8 +217,9 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
-# Dados brutos baixados da Câmara
+# Dados baixados da Câmara e arquivos intermediários do pipeline
 dados/brutos/
+dados/processado/
 
 # HTML gerado pelo Pyvis
 *.html

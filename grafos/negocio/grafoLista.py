@@ -1,6 +1,6 @@
 """
 O Gabinete - Mapa de Similaridade Politica entre Deputados Federais
-Arquivo: src/negocio/grafoLista.py
+Arquivo: grafos/negocio/grafoLista.py
 
 Integrantes:
     Caio Ariel Cardoso Saraiva  - RA 10439611
@@ -15,6 +15,7 @@ Sintese:
 
 Historico de alteracoes:
     24/09/2026 - Isabela - Inclusao do codigo da aula no projeto.
+    18/10/2026 - Isabela - Caminho do cabecalho atualizado apos a reorganizacao das pastas.
 """
 
 # Grafo como uma lista de adjacência

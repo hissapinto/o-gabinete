@@ -21,18 +21,18 @@ motivo alheio ao que está sendo avaliado.
 
 ## Decisão
 
-O sistema é dividido em camadas, com o arquivo `dados/grafos.txt` como fronteira
+O sistema é dividido em camadas, com o arquivo `dados/grafo.txt` como fronteira
 explícita entre o pipeline de dados e a aplicação.
 
 ```
 O_Gabinete/
 ├── dados/
 │   ├── brutos/                 CSVs baixados, não versionado
-│   └── grafos.txt              camada de dados
+│   └── grafo.txt               camada de dados
 ├── docs/
 │   ├── adr/                    registros de decisão
 │   └── spikes/                 investigação descartável
-├── grafos/
+├── grafos/                     aplicação de terminal
 │   ├── apresentacao/           camada de apresentação
 │   │   └── menu.py
 │   ├── negocio/                camada de negócio
@@ -41,25 +41,29 @@ O_Gabinete/
 │   ├── persistencia/           camada de persistência
 │   │   └── persistencia.py
 │   └── main.py                 ponto de entrada
+├── infra/db/init/              esquema do banco da versão web
 ├── pipeline/                   subsistema offline
 │   ├── coleta.py
+│   ├── processamento.py
 │   ├── similaridade.py
-│   └── gerar_grafo.py
+│   ├── gerar_grafo.py
+│   └── carga.py                grava o resultado no banco
 ├── tests/
-├── web/
-│   └── frontend/
-│       └── app.py
+├── web/                        versão web
+│   ├── api/                    backend
+│   └── frontend/               interface
+├── docker-compose.yml
 ├── README.md
 └── requirements.txt
 ```
 
 | Camada | Módulo | Responsabilidade |
 |---|---|---|
-| Pipeline (subsistema offline) | `pipeline/coleta.py`, `pipeline/similaridade.py`, `pipeline/gerar_grafo.py` | Baixar os CSVs, consultar a API, calcular similaridade, gerar o arquivo |
+| Pipeline (subsistema offline) | `pipeline/coleta.py`, `pipeline/processamento.py`, `pipeline/similaridade.py`, `pipeline/gerar_grafo.py`, `pipeline/carga.py` | Baixar os CSVs, filtrar as votações de mérito, calcular a concordância, gerar o arquivo e carregar o banco |
 | Apresentação | `grafos/apresentacao/menu.py`, `web/frontend/app.py` | Interação com o usuário |
 | Negócio | `grafos/negocio/grafo.py`, `grafos/negocio/logica_grafos.py` | Estrutura do grafo e algoritmos |
-| Persistência | `grafos/persistencia/persistencia.py` | Leitura e gravação do `grafos.txt` |
-| Dados | `dados/grafos.txt` | Armazenamento |
+| Persistência | `grafos/persistencia/persistencia.py` | Leitura e gravação do `grafo.txt` |
+| Dados | `dados/grafo.txt` | Armazenamento |
 
 `grafos/main.py` é o ponto de entrada e não pertence a nenhuma camada: monta as
 peças e inicia a aplicação. Os arquivos em `docs/spikes/` também ficam fora das
@@ -70,7 +74,14 @@ depende das camadas, mas nenhuma camada depende dele.
 A dependência aponta sempre para baixo. As camadas são fechadas: a apresentação
 não acessa a persistência diretamente.
 
-Pandas existe somente no pipeline. Streamlit, Pyvis e NetworkX existem somente
-em `web/frontend/`; as camadas de negócio e persistência usam apenas a
-biblioteca padrão do Python, de modo que a aplicação de terminal continua
-executável sem instalar dependências externas.
+Pandas e numpy existem somente no pipeline; Streamlit, somente em
+`web/frontend/`; FastAPI e psycopg, somente em `web/api/`. As camadas de
+negócio, persistência e apresentação da aplicação de terminal usam apenas a
+biblioteca padrão do Python, de modo que ela continua executável sem instalar
+dependências externas.
+
+> **Nota de 18/10/2026.** A decisão registrada aqui não mudou. A árvore de
+> diretórios e a tabela de módulos foram atualizadas para refletir a
+> reorganização por componente (`src/` dividido em `grafos/` e `web/`) e a
+> inclusão do banco de dados, registrada no
+> [ADR-0002](introducao_banco_de_dados.md).

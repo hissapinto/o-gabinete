@@ -1,6 +1,6 @@
 """
 O Gabinete - Mapa de Similaridade Politica entre Deputados Federais
-Arquivo: src/main.py
+Arquivo: grafos/main.py
 
 Integrantes:
     Caio Ariel Cardoso Saraiva  - RA 10439611
@@ -13,22 +13,23 @@ Sintese:
     raiz do projeto e inicia o menu.
 
     Execucao, a partir de qualquer pasta:
-        python src/main.py
+        python grafos/main.py
 
 Historico de alteracoes:
     24/09/2026 - Grupo - Criacao.
+    18/10/2026 - Isabela - Caminhos atualizados apos a renomeacao de src/ para grafos/.
 """
 
 import os
 import sys
 
-# Pasta onde este arquivo esta (src/) e a raiz do projeto (um nivel acima).
-PASTA_SRC = os.path.dirname(os.path.abspath(__file__))
-RAIZ = os.path.dirname(PASTA_SRC)
+# Pasta onde este arquivo esta (grafos/) e a raiz do projeto (um nivel acima).
+PASTA_GRAFOS = os.path.dirname(os.path.abspath(__file__))
+RAIZ = os.path.dirname(PASTA_GRAFOS)
 
 # Permite importar os modulos das camadas pelo nome, sem pacotes.
 for camada in ("negocio", "persistencia", "apresentacao"):
-    sys.path.insert(0, os.path.join(PASTA_SRC, camada))
+    sys.path.insert(0, os.path.join(PASTA_GRAFOS, camada))
 
 # Garante que 'dados/grafo.txt' seja encontrado a partir da raiz do projeto.
 os.chdir(RAIZ)

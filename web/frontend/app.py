@@ -1,6 +1,6 @@
 """
 O Gabinete - Mapa de Similaridade Politica entre Deputados Federais
-Arquivo: src/apresentacao/app.py
+Arquivo: web/frontend/app.py
 
 Integrantes:
     Caio Ariel Cardoso Saraiva  - RA 10439611
@@ -14,6 +14,7 @@ Sintese:
 
 Historico de alteracoes:
     25/09/2026 - Caio - Criacao do Hello World atravessando as tres camadas.
+    18/10/2026 - Isabela - Caminho do cabecalho atualizado apos a reorganizacao das pastas.
 """
 
 import os
