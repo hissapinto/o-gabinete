@@ -382,25 +382,166 @@ O_Gabinete/
 
 ### 6.5 Como executar
 
-**Aplicação de terminal:**
+O projeto tem duas aplicações independentes, com preparações diferentes:
+
+| Aplicação | O que exige | Passos |
+|---|---|---|
+| Terminal (Teoria dos Grafos) | Python 3 | 1, e depois "Aplicação de terminal" |
+| Web (Lab. de Engenharia de Software) | Python 3 e Docker | 1 a 5 |
+
+No GitHub Codespaces nada precisa ser instalado: o `.devcontainer` já traz Python, Docker e o `.env` prontos.
+
+#### Pré-requisitos
+
+| | macOS | Linux (Debian/Ubuntu) | Windows |
+|---|---|---|---|
+| **Python 3.10+** | já instalado; `brew install python` atualiza | `sudo apt install python3 python3-venv python3-pip` | [python.org/downloads](https://www.python.org/downloads/) — marque **Add python.exe to PATH** no instalador |
+| **Docker** | [Docker Desktop](https://www.docker.com/products/docker-desktop/) | `sudo apt install docker.io docker-compose-plugin` | [Docker Desktop](https://www.docker.com/products/docker-desktop/), com WSL 2 |
+| **Git** | `xcode-select --install` | `sudo apt install git` | [git-scm.com](https://git-scm.com/download/win) |
+
+No Linux, para usar o `docker` sem `sudo`: `sudo usermod -aG docker $USER` e reabra a sessão.
+
+#### Passo 1 — Ambiente virtual (venv)
+
+O venv é uma pasta com um Python isolado e os pacotes do projeto dentro dela. Serve para que as versões fixadas no `requirements.txt` (pandas 3.0.5, psycopg 3.2.13) não conflitem com o que já estiver instalado na máquina para outras matérias.
+
+Ele é necessário para o `pipeline/carga.py` e para a aplicação de terminal, que rodam na sua máquina. A API, o banco e o frontend rodam dentro dos containers e carregam as próprias dependências — o venv não os afeta.
+
+Todos os comandos abaixo são executados na raiz do projeto.
+
+**macOS e Linux**
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+**Windows — PowerShell**
+
+```powershell
+py -m venv .venv
+.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+```
+
+Se o PowerShell recusar a ativação com `UnauthorizedAccess`, libere a execução apenas para esta janela e repita a linha:
+
+```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+```
+
+**Windows — Prompt de Comando (cmd)**
+
+```bat
+py -m venv .venv
+.venv\Scripts\activate.bat
+pip install -r requirements.txt
+```
+
+**Windows — Git Bash**
+
+```bash
+py -m venv .venv
+source .venv/Scripts/activate
+pip install -r requirements.txt
+```
+
+Com o ambiente ativo o prompt passa a exibir `(.venv)`. **Daqui em diante os comandos são idênticos em todos os sistemas**: dentro do venv, `python` e `pip` apontam para o Python do projeto, e não é mais preciso escolher entre `python`, `python3` e `py`.
+
+A ativação vale por janela de terminal. Em um terminal novo, repita apenas a linha de ativação — a criação e o `pip install` são uma vez só. Para sair do ambiente, `deactivate`.
+
+A pasta `.venv/` está no `.gitignore` e não vai para o repositório.
+
+#### Passo 2 — Variáveis do banco (`.env`)
+
+O `.env` guarda as credenciais do PostgreSQL e **não é versionado**: cada pessoa cria o seu a partir do modelo. Sem ele o `docker compose` avisa `variable is not set`, e o banco não sobe.
+
+macOS, Linux e Git Bash:
+
+```bash
+cp .env.example .env
+```
+
+PowerShell:
+
+```powershell
+Copy-Item .env.example .env
+```
+
+Prompt de Comando:
+
+```bat
+copy .env.example .env
+```
+
+Depois abra o `.env` e substitua `SENHA_AQUI` por uma senha qualquer — o banco é local e só a sua máquina o acessa. No Codespaces este passo é automático.
+
+#### Passo 3 — Subir os containers
+
+```
+docker compose up -d
+```
+
+Sobem três serviços: o banco na porta 5432, a API na 8000 e o frontend na 8501. O `-d` devolve o terminal; sem ele, os logs ocupam a janela.
+
+Confirme que a API respondeu antes de prosseguir:
+
+```
+curl localhost:8000/health
+```
+
+#### Passo 4 — Carga dos dados
+
+Com os containers no ar, o venv ativo e **de dentro da pasta `pipeline/`**:
+
+```
+cd pipeline
+python carga.py
+cd ..
+```
+
+A pasta importa: o `carga.py` carrega os módulos vizinhos por nome simples (`from coleta import ...`), o que só funciona quando ele é o ponto de entrada da própria pasta.
+
+O script baixa os CSVs do ano de referência, filtra as votações de mérito, calcula a concordância entre os deputados e grava tudo no banco em uma única transação. A primeira execução leva alguns minutos, por causa do download. Rodar de novo não duplica os dados: as votações do ano são substituídas, e uma execução nova é registrada em `app.execucao`.
+
+#### Passo 5 — Acessar
+
+| Endereço | O que é |
+|---|---|
+| `http://localhost:8501` | frontend em Streamlit |
+| `http://localhost:8000/docs` | documentação interativa da API, gerada pelo FastAPI |
+| `http://localhost:8000/health` | confirma que o backend está no ar |
+
+#### Aplicação de terminal
+
+Independe de Docker e de banco: lê o `dados/grafo.txt`, que é versionado. Com o venv ativo, a partir da raiz:
 
 ```
 python grafos/main.py
 ```
 
-**Versão web** (no GitHub Codespaces, ou localmente com Docker instalado):
+#### Comandos úteis
 
-```
-cp .env.example .env
-docker compose up
-```
+| Comando | O que faz |
+|---|---|
+| `docker compose ps` | lista os serviços no ar |
+| `docker compose logs -f backend` | acompanha os logs da API |
+| `docker compose restart backend` | recarrega a API |
+| `docker compose down` | para tudo, preservando os dados do banco |
+| `docker compose down -v` | para tudo e **apaga o banco** |
+| `deactivate` | sai do venv |
 
-O frontend fica disponível na porta 8501 e a API na porta 8000 (a rota `/health` confirma que o backend está no ar). No Codespaces, o arquivo `.env` é criado automaticamente na primeira abertura do ambiente.
+#### Problemas comuns
 
-**Carga dos dados no banco** (com os containers no ar, a partir da pasta `pipeline/`):
-
-```
-python carga.py
-```
-
-O script baixa os CSVs do ano de referência, filtra as votações de mérito, calcula a concordância entre os deputados e grava tudo no banco em uma única transação. Rodar de novo não duplica os dados: as votações do ano são substituídas, e uma execução nova é registrada em `app.execucao`.
+| Sintoma | Causa | Solução |
+|---|---|---|
+| `variable is not set` ou `env file .env not found` | o `.env` não existe | passo 2 |
+| `command not found: python` no macOS ou Linux | nesses sistemas o executável é `python3` | ative o venv e use `python`, ou chame `python3` |
+| `Expecting value: line 1 column 1` ao formatar a resposta com `json.tool` | a API não respondeu e o `json.tool` recebeu conteúdo vazio | `docker compose logs backend` |
+| `UnauthorizedAccess` ao ativar o venv no PowerShell | política de execução de scripts | `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass` |
+| `No module named venv` no Linux | o venv vem em pacote separado | `sudo apt install python3-venv` |
+| `permission denied` no docker, no Linux | usuário fora do grupo `docker` | `sudo usermod -aG docker $USER` e reabra a sessão |
+| `port is already allocated` | outro processo ocupa 5432, 8000 ou 8501 | pare o processo, ou derrube os containers de outro projeto |
+| `password authentication failed` | o volume do banco foi criado com credenciais diferentes das do `.env` atual | `docker compose down -v` e suba de novo |
+| `ModuleNotFoundError: No module named 'pandas'` | venv inativo, ou `pip install` não executado | passo 1 |
