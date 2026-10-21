@@ -1,0 +1,299 @@
+{
+  "info": {
+    "name": "O Gabinete - API",
+    "description": "Testes de contrato da API, para rodar no Postman ou no Newman contra uma API no ar.\n\nDiferente da suite em web/api/tests, que monta o proprio banco e confere valores exatos, esta colecao roda contra o banco carregado pelo pipeline, cujos numeros mudam a cada carga. Por isso as verificacoes sao de contrato e de invariante: status, formato, ordenacao e somas que precisam fechar quaisquer que sejam os dados.\n\nOs ids nao estao fixos: a colecao descobre ano, deputados e pares a partir das proprias respostas, na ordem em que as requisicoes aparecem. Rode a colecao inteira, nao requisicoes isoladas.\n\nIntegrantes: Caio Ariel Cardoso Saraiva (RA 10439611), Isabela Hissa Pinto (RA 10441873), Kaique Barros Paiva (RA 10441787).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8000" },
+    { "key": "ano", "value": "" },
+    { "key": "deputadoA", "value": "" },
+    { "key": "deputadoB", "value": "" },
+    { "key": "percentualDoPar", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "1. Saude: GET /health",
+      "request": { "method": "GET", "url": "{{baseUrl}}/health" },
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('responde 200', () => pm.response.to.have.status(200));",
+          "const c = pm.response.json();",
+          "pm.test('diz que esta ok', () => pm.expect(c.status).to.eql('ok'));",
+          "pm.test('responde rapido, pois nao toca no banco', () => pm.expect(pm.response.responseTime).to.be.below(1000));"
+        ]}
+      }]
+    },
+    {
+      "name": "2. Anos: GET /anos",
+      "request": { "method": "GET", "url": "{{baseUrl}}/anos" },
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('responde 200', () => pm.response.to.have.status(200));",
+          "const anos = pm.response.json().anos;",
+          "pm.test('ha pelo menos um ano com grafo', () => pm.expect(anos.length).to.be.above(0));",
+          "pm.test('vem do mais recente para o mais antigo', () => {",
+          "  const v = anos.map(a => a.ano);",
+          "  pm.expect(v).to.eql([...v].sort((x, y) => y - x));",
+          "});",
+          "pm.test('nenhum ano repetido', () => {",
+          "  const v = anos.map(a => a.ano);",
+          "  pm.expect(new Set(v).size).to.eql(v.length);",
+          "});",
+          "pm.collectionVariables.set('ano', anos[0].ano);"
+        ]}
+      }]
+    },
+    {
+      "name": "3. Grafo: GET /anos/{ano}/grafo",
+      "request": { "method": "GET", "url": "{{baseUrl}}/anos/{{ano}}/grafo" },
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('responde 200', () => pm.response.to.have.status(200));",
+          "const c = pm.response.json();",
+          "pm.test('traz nos e arestas', () => {",
+          "  pm.expect(c.nos).to.be.an('array').that.is.not.empty;",
+          "  pm.expect(c.arestas).to.be.an('array').that.is.not.empty;",
+          "});",
+          "pm.test('o no tem os campos que a tela usa', () => {",
+          "  pm.expect(c.nos[0]).to.have.all.keys('deputado_id', 'nome', 'sigla_partido', 'sigla_uf');",
+          "});",
+          "pm.test('toda aresta liga dois nos existentes', () => {",
+          "  const ids = new Set(c.nos.map(n => n.deputado_id));",
+          "  c.arestas.forEach(a => {",
+          "    pm.expect(ids.has(a.deputado_a), `no ${a.deputado_a} ausente`).to.be.true;",
+          "    pm.expect(ids.has(a.deputado_b), `no ${a.deputado_b} ausente`).to.be.true;",
+          "  });",
+          "});",
+          "pm.test('o par vem sempre com o menor id primeiro', () => {",
+          "  c.arestas.forEach(a => pm.expect(a.deputado_a).to.be.below(a.deputado_b));",
+          "});",
+          "pm.test('percentual entre 0 e 100', () => {",
+          "  c.arestas.forEach(a => {",
+          "    const p = Number(a.percentual);",
+          "    pm.expect(p).to.be.at.least(0); pm.expect(p).to.be.at.most(100);",
+          "  });",
+          "});",
+          "pm.test('nenhum laco: aresta de um deputado para si mesmo', () => {",
+          "  c.arestas.forEach(a => pm.expect(a.deputado_a).to.not.eql(a.deputado_b));",
+          "});",
+          "const a = c.arestas[0];",
+          "pm.collectionVariables.set('deputadoA', a.deputado_a);",
+          "pm.collectionVariables.set('deputadoB', a.deputado_b);"
+        ]}
+      }]
+    },
+    {
+      "name": "4. Grafo: ano sem execucao devolve 404",
+      "request": { "method": "GET", "url": "{{baseUrl}}/anos/1900/grafo" },
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('responde 404', () => pm.response.to.have.status(404));",
+          "pm.test('explica o motivo', () => pm.expect(pm.response.json().detail).to.include('1900'));"
+        ]}
+      }]
+    },
+    {
+      "name": "5. Ficha: GET /anos/{ano}/deputados/{id}",
+      "request": { "method": "GET", "url": "{{baseUrl}}/anos/{{ano}}/deputados/{{deputadoA}}" },
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('responde 200', () => pm.response.to.have.status(200));",
+          "const c = pm.response.json();",
+          "pm.test('tem as tres chaves do contrato', () => {",
+          "  pm.expect(c).to.have.all.keys('ano', 'deputado', 'mais_similares');",
+          "});",
+          "pm.test('a ficha e do deputado pedido', () => {",
+          "  pm.expect(String(c.deputado.deputado_id)).to.eql(pm.collectionVariables.get('deputadoA'));",
+          "});",
+          "pm.test('ordenada do maior percentual para o menor', () => {",
+          "  const p = c.mais_similares.map(s => Number(s.percentual));",
+          "  pm.expect(p).to.eql([...p].sort((x, y) => y - x));",
+          "});",
+          "pm.test('o deputado nao aparece na propria lista', () => {",
+          "  const ids = c.mais_similares.map(s => s.deputado_id);",
+          "  pm.expect(ids).to.not.include(c.deputado.deputado_id);",
+          "});",
+          "pm.test('nenhum similar repetido', () => {",
+          "  const ids = c.mais_similares.map(s => s.deputado_id);",
+          "  pm.expect(new Set(ids).size).to.eql(ids.length);",
+          "});",
+          "if (c.mais_similares.length) {",
+          "  pm.collectionVariables.set('deputadoB', c.mais_similares[0].deputado_id);",
+          "  pm.collectionVariables.set('percentualDoPar', String(c.mais_similares[0].percentual));",
+          "}"
+        ]}
+      }]
+    },
+    {
+      "name": "6. Ficha: limite corta a lista",
+      "request": { "method": "GET", "url": "{{baseUrl}}/anos/{{ano}}/deputados/{{deputadoA}}?limite=3" },
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('responde 200', () => pm.response.to.have.status(200));",
+          "pm.test('no maximo 3 similares', () => {",
+          "  pm.expect(pm.response.json().mais_similares.length).to.be.at.most(3);",
+          "});"
+        ]}
+      }]
+    },
+    {
+      "name": "7. Ficha: id inexistente devolve 404",
+      "request": { "method": "GET", "url": "{{baseUrl}}/anos/{{ano}}/deputados/999999" },
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('responde 404', () => pm.response.to.have.status(404));"
+        ]}
+      }]
+    },
+    {
+      "name": "8. Ficha: limite fora da faixa devolve 422",
+      "request": { "method": "GET", "url": "{{baseUrl}}/anos/{{ano}}/deputados/{{deputadoA}}?limite=0" },
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('responde 422, validado pelo FastAPI', () => pm.response.to.have.status(422));"
+        ]}
+      }]
+    },
+    {
+      "name": "9. Par: GET /anos/{ano}/concordancias/{a}/{b}",
+      "request": { "method": "GET", "url": "{{baseUrl}}/anos/{{ano}}/concordancias/{{deputadoA}}/{{deputadoB}}" },
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('responde 200', () => pm.response.to.have.status(200));",
+          "const c = pm.response.json();",
+          "pm.test('status completo ou insuficiente', () => {",
+          "  pm.expect(['completo', 'insuficiente']).to.include(c.status);",
+          "});",
+          "if (c.status !== 'completo') { return; }",
+          "pm.test('concordancias mais divergencias e o total em comum', () => {",
+          "  pm.expect(c.concordancias + c.divergencias).to.eql(c.votacoes_em_comum);",
+          "});",
+          "pm.test('percentual confere com os contadores', () => {",
+          "  const esperado = Math.round((c.concordancias * 10000) / c.votacoes_em_comum) / 100;",
+          "  pm.expect(Number(c.percentual)).to.be.closeTo(esperado, 0.01);",
+          "});",
+          "pm.test('os totais das duas listas somam o total em comum', () => {",
+          "  const l = c.listas;",
+          "  pm.expect(l.concordancias.total + l.divergencias.total).to.eql(c.votacoes_em_comum);",
+          "});",
+          "pm.test('sem limite, as listas vem inteiras', () => {",
+          "  const l = c.listas;",
+          "  pm.expect(l.limite).to.eql(null);",
+          "  pm.expect(l.concordancias.itens.length).to.eql(l.concordancias.total);",
+          "  pm.expect(l.divergencias.itens.length).to.eql(l.divergencias.total);",
+          "});",
+          "pm.test('cada item esta na lista certa', () => {",
+          "  c.listas.concordancias.itens.forEach(i => pm.expect(i.concordaram).to.be.true);",
+          "  c.listas.divergencias.itens.forEach(i => pm.expect(i.concordaram).to.be.false);",
+          "});",
+          "pm.test('o item traz o voto literal de cada um', () => {",
+          "  const todos = [...c.listas.concordancias.itens, ...c.listas.divergencias.itens];",
+          "  if (!todos.length) { return; }",
+          "  pm.expect(todos[0]).to.include.keys('votacao_id', 'data', 'descricao', 'voto_a', 'voto_b', 'concordaram');",
+          "});",
+          "pm.test('a RN01 vale: so Sim, Nao e Obstrucao entram', () => {",
+          "  const validos = ['Sim', 'Não', 'Obstrução'];",
+          "  [...c.listas.concordancias.itens, ...c.listas.divergencias.itens].forEach(i => {",
+          "    pm.expect(validos).to.include(i.voto_a);",
+          "    pm.expect(validos).to.include(i.voto_b);",
+          "  });",
+          "});",
+          "pm.test('as listas vem da mais recente para a mais antiga', () => {",
+          "  const datas = c.listas.concordancias.itens.map(i => i.data);",
+          "  pm.expect(datas).to.eql([...datas].sort().reverse());",
+          "});",
+          "pm.test('o percentual bate com o que a ficha mostrou para o mesmo par', () => {",
+          "  const daFicha = pm.collectionVariables.get('percentualDoPar');",
+          "  if (!daFicha) { return; }",
+          "  pm.expect(Number(c.percentual)).to.be.closeTo(Number(daFicha), 0.01);",
+          "});"
+        ]}
+      }]
+    },
+    {
+      "name": "10. Par: tipo preenche so a lista pedida",
+      "request": { "method": "GET", "url": "{{baseUrl}}/anos/{{ano}}/concordancias/{{deputadoA}}/{{deputadoB}}?tipo=divergencia" },
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('responde 200', () => pm.response.to.have.status(200));",
+          "const l = pm.response.json().listas;",
+          "pm.test('o tipo volta na resposta', () => pm.expect(l.tipo).to.eql('divergencia'));",
+          "pm.test('a lista nao pedida vem nula, e nao vazia', () => {",
+          "  pm.expect(l.concordancias).to.eql(null);",
+          "});",
+          "pm.test('a lista pedida vem preenchida', () => {",
+          "  pm.expect(l.divergencias).to.not.eql(null);",
+          "});"
+        ]}
+      }]
+    },
+    {
+      "name": "11. Par: limite nao altera os totais",
+      "request": { "method": "GET", "url": "{{baseUrl}}/anos/{{ano}}/concordancias/{{deputadoA}}/{{deputadoB}}?limite=2" },
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('responde 200', () => pm.response.to.have.status(200));",
+          "const c = pm.response.json();",
+          "if (c.status !== 'completo') { return; }",
+          "pm.test('no maximo 2 itens em cada lista', () => {",
+          "  pm.expect(c.listas.concordancias.itens.length).to.be.at.most(2);",
+          "  pm.expect(c.listas.divergencias.itens.length).to.be.at.most(2);",
+          "});",
+          "pm.test('os totais continuam sendo os do par inteiro', () => {",
+          "  const l = c.listas;",
+          "  pm.expect(l.concordancias.total + l.divergencias.total).to.eql(c.votacoes_em_comum);",
+          "});"
+        ]}
+      }]
+    },
+    {
+      "name": "12. Par: ordem dos ids na URL nao importa",
+      "request": { "method": "GET", "url": "{{baseUrl}}/anos/{{ano}}/concordancias/{{deputadoB}}/{{deputadoA}}" },
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('responde 200', () => pm.response.to.have.status(200));",
+          "const c = pm.response.json();",
+          "pm.test('o par e normalizado com o menor id em deputado_a', () => {",
+          "  pm.expect(c.deputado_a).to.be.below(c.deputado_b);",
+          "});"
+        ]}
+      }]
+    },
+    {
+      "name": "13. Par: dois ids iguais devolve 422",
+      "request": { "method": "GET", "url": "{{baseUrl}}/anos/{{ano}}/concordancias/{{deputadoA}}/{{deputadoA}}" },
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('responde 422', () => pm.response.to.have.status(422));",
+          "pm.test('explica o motivo', () => {",
+          "  pm.expect(String(pm.response.json().detail)).to.include('diferentes');",
+          "});"
+        ]}
+      }]
+    },
+    {
+      "name": "14. Par: tipo invalido devolve 422",
+      "request": { "method": "GET", "url": "{{baseUrl}}/anos/{{ano}}/concordancias/{{deputadoA}}/{{deputadoB}}?tipo=banana" },
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('responde 422, validado pelo Literal da assinatura', () => pm.response.to.have.status(422));"
+        ]}
+      }]
+    }
+  ]
+}

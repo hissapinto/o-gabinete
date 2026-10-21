@@ -1,0 +1,5 @@
+# Dependencias usadas apenas para rodar a suite de testes do web/api.
+# As de producao ficam em requirements.txt, que o Dockerfile instala.
+-r requirements.txt
+pytest==8.3.4
+httpx==0.28.1
