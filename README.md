@@ -3,6 +3,8 @@
 > **TG1 – Definição do Produto de Software**
 > Laboratório de Engenharia de Software — Universidade Presbiteriana Mackenzie
 
+[![Testes da API](https://github.com/hissapinto/O_Gabinete/actions/workflows/testes-api.yml/badge.svg)](https://github.com/hissapinto/O_Gabinete/actions/workflows/testes-api.yml)
+
 ---
 
 ## Capa
@@ -376,7 +378,9 @@ O_Gabinete/
 | Banco de dados | PostgreSQL 16, acessado com `psycopg` | versão web |
 | Containers | Docker e Docker Compose | versão web |
 | Ambiente de desenvolvimento | GitHub Codespaces (`.devcontainer`) | todo o projeto |
-| Testes | pytest | `tests/` |
+| Testes | pytest | `web/api/tests/` (API) e `tests/` (aplicação de terminal) |
+| Integração contínua | GitHub Actions | `.github/workflows/` |
+| Testes de contrato da API | coleção Postman, executável por Newman | `web/api/postman/` |
 | Fonte de dados | Portal de Dados Abertos da Câmara dos Deputados | pipeline |
 | Controle de versão | Git e GitHub | todo o projeto |
 
@@ -545,3 +549,99 @@ python grafos/main.py
 | `port is already allocated` | outro processo ocupa 5432, 8000 ou 8501 | pare o processo, ou derrube os containers de outro projeto |
 | `password authentication failed` | o volume do banco foi criado com credenciais diferentes das do `.env` atual | `docker compose down -v` e suba de novo |
 | `ModuleNotFoundError: No module named 'pandas'` | venv inativo, ou `pip install` não executado | passo 1 |
+
+### 6.6 Testes automatizados
+
+A API tem duas suítes, com papéis diferentes e que não se substituem:
+
+| Suíte | Onde | O que verifica | Precisa da API no ar? |
+|---|---|---|---|
+| pytest | `web/api/tests/` | valores exatos sobre um banco que ela mesma monta | não |
+| Postman | `web/api/postman/` | contrato e invariantes sobre o banco carregado pelo pipeline | sim |
+
+A suíte em pytest é a que roda na integração contínua. A coleção do Postman serve para inspeção manual e para conferir a API rodando com dados reais, em que os números mudam a cada carga.
+
+#### Estrutura
+
+A pasta de testes espelha as camadas da API, então cada arquivo de teste tem um arquivo de código correspondente:
+
+```
+web/api/
+├── repositorios/            ←→  tests/repositorios/
+├── servicos/                ←→  tests/servicos/
+├── rotas/                   ←→  tests/rotas/
+├── pytest.ini               configuração da suíte
+├── requirements-dev.txt     dependências só dos testes
+└── tests/
+    ├── cenario.py           os dados de teste e os números que deles decorrem
+    └── conftest.py          cria o banco de teste e entrega conexão e cliente
+```
+
+Cada camada é verificada pelo que lhe cabe. Os testes de **repositório** executam SQL de verdade contra o PostgreSQL, porque é no SQL que mora a lógica dessas funções. Os de **serviço** verificam as regras de decisão: qual entrada resulta em 404, qual resulta em lista vazia, qual execução é escolhida quando o ano tem mais de uma. Os de **rota** usam o `TestClient` do FastAPI e verificam a tradução para HTTP — os status, e a validação que o FastAPI faz a partir das anotações de tipo da assinatura.
+
+#### Banco de teste
+
+A suíte **não usa o banco de desenvolvimento**. A cada execução ela apaga e recria um banco separado, por padrão `gabinete_teste`, aplica nele o mesmo `infra/db/init/01-schema.sql` que o container usa e grava o cenário de `tests/cenario.py`. Nenhum dado de `carga.py` é necessário, e nada do banco de desenvolvimento é alterado.
+
+O cenário é pequeno e deliberado: sete deputados e oito votações, escolhidos para cobrir as armadilhas da RN01 (Obstrução contando como voto contra, Abstenção e Artigo 17 fora da conta, votação de outro ano fora do ano pedido) e os desfechos de cada endpoint (deputado no grafo, deputado que votou mas ficou fora dele, deputado que nunca votou, ano com e sem execução, e duas execuções no mesmo ano para provar que vale a mais recente).
+
+#### Rodando localmente
+
+Com os containers no ar e o venv ativo, a partir da raiz:
+
+```
+pip install -r web/api/requirements-dev.txt
+cd web/api
+pytest
+```
+
+O `cd` é necessário: o `pytest.ini` que configura a suíte está em `web/api/`, que é também a pasta que o container monta como `/app`. Rodar de lá faz os testes importarem `rotas`, `servicos` e `repositorios` exatamente como o `main.py` importa.
+
+Se o PostgreSQL não estiver acessível, a suíte para com uma mensagem dizendo o que fazer, em vez de deixar todos os testes falharem com erro de driver.
+
+Comandos úteis durante o desenvolvimento:
+
+| Comando | O que faz |
+|---|---|
+| `pytest` | roda tudo |
+| `pytest -v` | roda tudo, nomeando cada teste |
+| `pytest tests/repositorios` | só uma camada |
+| `pytest -k concordancia` | só os testes cujo nome contém o termo |
+| `pytest -x` | para no primeiro que falhar |
+
+#### Variáveis de ambiente
+
+A suíte lê as mesmas variáveis do `.env`, e usa estes padrões quando elas não existem:
+
+| Variável | Padrão | Para quê |
+|---|---|---|
+| `POSTGRES_HOST` | `localhost` | onde o banco está |
+| `POSTGRES_PORT` | `5432` | porta exposta pelo compose |
+| `POSTGRES_USER` | `gabinete` | usuário do banco |
+| `POSTGRES_PASSWORD` | `gabinete_local` | senha do banco |
+| `POSTGRES_DB` | `postgres` | banco usado só para criar o de teste |
+| `POSTGRES_DB_TESTE` | `gabinete_teste` | banco que a suíte apaga e recria |
+
+#### Integração contínua
+
+O workflow `.github/workflows/testes-api.yml` roda a suíte a cada push em qualquer branch e a cada pull request para a `main`. O PostgreSQL sobe como serviço do próprio job, com `healthcheck` para os testes não começarem antes de o banco aceitar conexão, e a suíte cria o banco de teste dentro dele.
+
+O job não depende de carga de dados nem da API no ar, então não acessa a internet nem o Portal da Câmara: roda em segundos e não falha por indisponibilidade de terceiros.
+
+O resultado aparece no selo no topo deste README e em cada pull request.
+
+#### A coleção do Postman
+
+Para inspeção manual, importe `web/api/postman/O_Gabinete.postman_collection.json` no Postman: **Import → File**. Com a API no ar, use **Run collection** para executar as quatorze requisições em sequência.
+
+Ela não tem ids fixos. Cada requisição descobre o que a próxima precisa a partir da resposta anterior: o ano vem de `/anos`, o par de deputados vem de uma aresta do grafo, e o percentual visto na ficha é comparado com o do endpoint do par. Por isso **rode a coleção inteira**, e não requisições isoladas.
+
+Como os dados vêm da carga real, as verificações são de invariante, e não de valor fixo — por exemplo, que `concordancias + divergencias` seja igual a `votacoes_em_comum`, que toda aresta aponte para um nó presente na lista de nós, que as listas venham da votação mais recente para a mais antiga, e que nenhum voto fora de Sim, Não e Obstrução apareça nas listas.
+
+A mesma coleção roda sem interface pelo Newman, caso o grupo queira incluí-la num workflow mais adiante:
+
+```
+npx newman run web/api/postman/O_Gabinete.postman_collection.json
+```
+
+Também é possível gerar uma coleção automaticamente a partir do contrato que o FastAPI publica, por **Import → Link** com `http://localhost:8000/openapi.json`. Essa versão traz as rotas e os parâmetros, mas sem nenhuma verificação: serve para explorar, não para testar.

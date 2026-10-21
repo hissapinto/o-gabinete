@@ -2,4 +2,5 @@ numpy==2.5.2
 pandas==3.0.5
 requests==2.34.2
 jupyter==1.1.1
+# Mantenha esta versao igual a do web/api/requirements.txt.
 psycopg[binary]==3.2.13
