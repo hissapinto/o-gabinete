@@ -1,3 +1,5 @@
 fastapi==0.115.6
 uvicorn[standard]==0.34.0
-psycopg[binary]==3.2.3
+# Mantenha esta versao igual a do requirements.txt da raiz: um venv
+# so serve o pipeline e os testes, e versoes diferentes nao coexistem.
+psycopg[binary]==3.2.13
