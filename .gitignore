@@ -228,3 +228,9 @@ visual_temp/
 # macOS / Windows
 .DS_Store
 Thumbs.db
+# Estrutura interna do workspace Git do Postman. A colecao versionada e o
+# arquivo unico web/api/postman/O_Gabinete.postman_collection.json, que
+# qualquer pessoa importa com um clique e o Newman executa direto.
+web/api/postman/.postman/
+web/api/postman/postman/
+web/api/postman/O Gabinete - API/

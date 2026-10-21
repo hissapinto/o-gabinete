@@ -42,7 +42,7 @@
           "  const v = anos.map(a => a.ano);",
           "  pm.expect(new Set(v).size).to.eql(v.length);",
           "});",
-          "pm.collectionVariables.set('ano', anos[0].ano);"
+          "pm.collectionVariables.set('ano', String(anos[0].ano));"
         ]}
       }]
     },
@@ -81,8 +81,8 @@
           "  c.arestas.forEach(a => pm.expect(a.deputado_a).to.not.eql(a.deputado_b));",
           "});",
           "const a = c.arestas[0];",
-          "pm.collectionVariables.set('deputadoA', a.deputado_a);",
-          "pm.collectionVariables.set('deputadoB', a.deputado_b);"
+          "pm.collectionVariables.set('deputadoA', String(a.deputado_a));",
+          "pm.collectionVariables.set('deputadoB', String(a.deputado_b));"
         ]}
       }]
     },
@@ -109,7 +109,7 @@
           "  pm.expect(c).to.have.all.keys('ano', 'deputado', 'mais_similares');",
           "});",
           "pm.test('a ficha e do deputado pedido', () => {",
-          "  pm.expect(String(c.deputado.deputado_id)).to.eql(pm.collectionVariables.get('deputadoA'));",
+          "  pm.expect(Number(c.deputado.deputado_id)).to.eql(Number(pm.collectionVariables.get('deputadoA')));",
           "});",
           "pm.test('ordenada do maior percentual para o menor', () => {",
           "  const p = c.mais_similares.map(s => Number(s.percentual));",
@@ -124,7 +124,7 @@
           "  pm.expect(new Set(ids).size).to.eql(ids.length);",
           "});",
           "if (c.mais_similares.length) {",
-          "  pm.collectionVariables.set('deputadoB', c.mais_similares[0].deputado_id);",
+          "  pm.collectionVariables.set('deputadoB', String(c.mais_similares[0].deputado_id));",
           "  pm.collectionVariables.set('percentualDoPar', String(c.mais_similares[0].percentual));",
           "}"
         ]}
