@@ -1,0 +1,4 @@
+# Dependencias do exportar_dados.py (so o layout do grafo; o resto e biblioteca padrao).
+# numpy na mesma versao do requirements.txt da raiz.
+networkx==3.7
+numpy==2.5.2
