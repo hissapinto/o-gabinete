@@ -18,7 +18,7 @@
 | **Professores** | Gustavo Moreira Calixto (Lab. de Engenharia de Software) · Ivan Carlos Alcântara de Oliveira (Teoria dos Grafos) · Profa. Elisângela Botelho Gracias (Interção Humano Computador) |
 | **Projeto** | O Gabinete — Mapa de Similaridade Política entre Deputados Federais |
 | **Grupo** | Caio Ariel Cardoso Saraiva (RA 10439611) · Isabela Hissa Pinto (RA 10441873) · Kaique Barros Paiva (RA 10441787) · Mateus Kage Moya (RA 10332608) |
-| **Repositório** | [github.com/hissapinto/O_Gabinete](https://github.com/hissapinto/O_Gabinete) |
+| **Repositório** | [github.com/hissapinto/o-gabinete](https://github.com/hissapinto/o-gabinete) |
 | **Entrega** | TG1 |
 
 > **Composição por disciplina.** O enunciado de Teoria dos Grafos limita os grupos a três integrantes. Naquela disciplina o projeto é entregue por Caio Ariel Cardoso Saraiva, Isabela Hissa Pinto e Kaique Barros Paiva. No Laboratório de Engenharia de Software o grupo conta também com Mateus Kage Moya.
@@ -314,12 +314,27 @@ A dependência aponta sempre para baixo, e as camadas são fechadas: a apresenta
 
 **Modelo de dados atual.** O banco tem oito tabelas, divididas em dois blocos. Os dados da Câmara ficam em `deputado`, `proposicao`, `votacao`, `votacao_proposicao` e `voto`; os resultados do pipeline, em `execucao`, `concordancia` e `aresta`. Cada execução do `carga.py` registra em `app.execucao` os parâmetros usados (ano, mínimo de votações em comum, número de vizinhos e concordância mínima), de modo que versões diferentes do grafo podem conviver no banco e ser comparadas. As arestas gravadas são as mesmas do `grafo.txt`, porque a carga passa pelas funções do `similaridade.py` e do `gerar_grafo.py`.
 
+**Endpoints da API.** A versão web expõe seis rotas, todas `GET` e todas devolvendo JSON. As duas primeiras não dependem do pipeline; as demais leem sempre a execução mais recente do ano pedido.
+
+| Rota | Parâmetros opcionais | Devolve | Outros desfechos |
+|---|---|---|---|
+| `/health` | — | confirma que a API está no ar, sem tocar no banco | — |
+| `/deputados` | — | todos os deputados cadastrados, em ordem alfabética | 503 se o banco estiver fora |
+| `/anos` | — | anos com grafo disponível, do mais recente ao mais antigo | — |
+| `/anos/{ano}/grafo` | — | nós e arestas da tela inicial | 404 se o ano não tem execução |
+| `/anos/{ano}/deputados/{id}` | `limite` (1 a 50, padrão 10) | ficha do deputado e os mais similares a ele | 404 se o ano não tem execução ou se ele não votou no ano; 200 com lista vazia se votou mas ficou fora do grafo |
+| `/anos/{ano}/concordancias/{a}/{b}` | `tipo` (`todas`, `concordancia`, `divergencia`), `limite` (sem limite por padrão), `offset` | contadores do par e as votações em que concordaram e divergiram, em duas listas | 422 se os dois ids forem iguais; 404 se o ano não tem execução ou se algum deles não votou; `status: "insuficiente"` se o par não tem concordância calculada |
+
+A validação dos parâmetros não é escrita à mão: o FastAPI a deriva das anotações de tipo na assinatura de cada rota, e por isso valor fora da faixa devolve 422 sem nenhum `if`. A documentação interativa em `/docs` é gerada da mesma fonte.
+
 ### 6.3 Estrutura de diretórios
 
 ```
-O_Gabinete/
+o-gabinete/
 ├── .devcontainer/
 │   └── devcontainer.json       ambiente do GitHub Codespaces
+├── .github/
+│   └── workflows/              integração contínua (testes da API)
 ├── dados/
 │   ├── brutos/                 CSVs baixados, não versionado
 │   └── grafo.txt               grafo da aplicação de terminal
@@ -350,15 +365,17 @@ O_Gabinete/
 │   ├── processamento.py
 │   ├── similaridade.py
 │   ├── gerar_grafo.py
-│   └── carga.py                carga do banco da versão web
-├── tests/
+│   ├── carga.py                carga do banco da versão web
+│   └── view-CSV.ipynb          exploração dos CSVs, fora do fluxo do pipeline
 ├── web/
 │   ├── api/                    backend da versão web (FastAPI)
 │   │   ├── main.py             cria a aplicação e registra os routers
 │   │   ├── banco.py            conexão com o PostgreSQL
 │   │   ├── rotas/              endpoints HTTP
 │   │   ├── servicos/           regras de negócio
-│   │   └── repositorios/       consultas SQL
+│   │   ├── repositorios/       consultas SQL
+│   │   ├── tests/              suíte automatizada, espelhando as camadas
+│   │   └── postman/            coleção de testes de contrato
 │   ├── frontend/               interface web (Streamlit)
 │   │   └── app.py
 │   └── prototipo/              protótipo de alta fidelidade, publicado no GitHub Pages
@@ -386,7 +403,7 @@ O_Gabinete/
 | Banco de dados | PostgreSQL 16, acessado com `psycopg` | versão web |
 | Containers | Docker e Docker Compose | versão web |
 | Ambiente de desenvolvimento | GitHub Codespaces (`.devcontainer`) | todo o projeto |
-| Testes | pytest | `web/api/tests/` (API) e `tests/` (aplicação de terminal) |
+| Testes | pytest | `web/api/tests/` |
 | Integração contínua | GitHub Actions | `.github/workflows/` |
 | Publicação do protótipo | GitHub Pages | `web/prototipo/` |
 | Testes de contrato da API | coleção Postman, executável por Newman | `web/api/postman/` |
@@ -570,6 +587,8 @@ A API tem duas suítes, com papéis diferentes e que não se substituem:
 
 A suíte em pytest é a que roda na integração contínua. A coleção do Postman serve para inspeção manual e para conferir a API rodando com dados reais, em que os números mudam a cada carga.
 
+A escolha de testar contra um PostgreSQL real, em vez de dublês, está registrada no [ADR-0003](docs/adr/testes_automatizados.md).
+
 #### Estrutura
 
 A pasta de testes espelha as camadas da API, então cada arquivo de teste tem um arquivo de código correspondente:
@@ -714,3 +733,5 @@ python exportar_dados.py
 O script tenta primeiro a API local, com os containers no ar, e salva as respostas como vieram — o que garante que os arquivos sigam o contrato real. Se a API não responder, ele recorre ao `dados/grafo.txt`, completando id e foto de cada deputado pela API de Dados Abertos da Câmara; quem não casar por nome e UF fica registrado em `relatorio_casamento.txt`.
 
 Detalhes do contrato dos JSONs e das decisões visuais estão em [`web/prototipo/README.md`](web/prototipo/README.md).
+
+A decisão de publicar um espelho estático do contrato da API, em vez de hospedar a aplicação inteira, está registrada no [ADR-0004](docs/adr/prototipo_estatico.md).

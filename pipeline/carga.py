@@ -1,3 +1,32 @@
+"""
+O Gabinete - Mapa de Similaridade Politica entre Deputados Federais
+Arquivo: pipeline/carga.py
+
+Integrantes:
+    Caio Ariel Cardoso Saraiva  - RA 10439611
+    Isabela Hissa Pinto         - RA 10441873
+    Kaique Barros Paiva         - RA 10441787
+
+Sintese:
+    Ultima etapa do pipeline. Grava no PostgreSQL tudo que a versao web le:
+    os dados da Camara (deputados, proposicoes, votacoes, os vinculos entre
+    votacao e proposicao, e os votos individuais) e os resultados do calculo
+    (execucao, concordancia entre pares e arestas do grafo).
+
+    Reaproveita as funcoes de similaridade.py e gerar_grafo.py em vez de
+    recalcular, de modo que as arestas gravadas no banco sejam exatamente as
+    mesmas do dados/grafo.txt que a aplicacao de terminal le.
+
+    Tudo acontece em uma transacao unica, e na ordem que as chaves
+    estrangeiras exigem: se qualquer etapa falhar, o banco fica como estava.
+    Rodar de novo nao duplica dados -- as votacoes do ano sao substituidas, e
+    cada carga registra uma execucao nova em app.execucao com os parametros
+    usados, o que permite comparar versoes diferentes do grafo.
+
+Historico de alteracoes:
+    07/10/2026 - Kaique - Criacao.
+"""
+
 import os
 
 import pandas as pd

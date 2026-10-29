@@ -25,7 +25,7 @@ O sistema é dividido em camadas, com o arquivo `dados/grafo.txt` como fronteira
 explícita entre o pipeline de dados e a aplicação.
 
 ```
-O_Gabinete/
+o-gabinete/
 ├── dados/
 │   ├── brutos/                 CSVs baixados, não versionado
 │   └── grafo.txt               camada de dados
@@ -48,10 +48,10 @@ O_Gabinete/
 │   ├── similaridade.py
 │   ├── gerar_grafo.py
 │   └── carga.py                grava o resultado no banco
-├── tests/
 ├── web/                        versão web
-│   ├── api/                    backend
-│   └── frontend/               interface
+│   ├── api/                    backend, com tests/ ao lado das camadas
+│   ├── frontend/               interface
+│   └── prototipo/              protótipo estático publicado no GitHub Pages
 ├── docker-compose.yml
 ├── README.md
 └── requirements.txt
@@ -85,3 +85,10 @@ dependências externas.
 > reorganização por componente (`src/` dividido em `grafos/` e `web/`) e a
 > inclusão do banco de dados, registrada no
 > [ADR-0002](introducao_banco_de_dados.md).
+>
+> **Nota de 29/10/2026.** A decisão continua valendo. Dois acréscimos desde
+> então, nenhum deles alterando as camadas: a suíte de testes da API, que
+> passou a morar em `web/api/tests/` espelhando as camadas em vez da pasta
+> `tests/` da raiz, e o protótipo estático em `web/prototipo/`, que é camada
+> de apresentação servida pelo GitHub Pages e lê JSONs no mesmo formato das
+> rotas da API.
