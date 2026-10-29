@@ -1,0 +1,186 @@
+<!doctype html>
+<!--
+  O Gabinete - Mapa de Similaridade Politica entre Deputados Federais
+  Arquivo: web/prototipo/index.html
+
+  Integrantes:
+      Caio Ariel Cardoso Saraiva  - RA 10439611
+      Isabela Hissa Pinto         - RA 10441873
+      Kaique Barros Paiva         - RA 10441787
+
+  Sintese:
+      Prototipo funcional de alta fidelidade (IHC, Parte 3). Pagina unica,
+      estatica: le os JSONs de dados/ e desenha o grafo com Cytoscape.js.
+
+  Historico de alteracoes:
+      29/10/2026 - Caio - Criacao.
+      29/10/2026 - Caio - Tema escuro por ?tema=escuro, icone neutro e
+                          botoes de zoom com dica.
+      29/10/2026 - Caio - Botao de tema claro/escuro no lugar do ?tema=,
+                          aviso do partido destacado.
+      29/10/2026 - Caio - Cytoscape embutido em js/vendor e aviso para quem
+                          abre o arquivo direto (file://).
+-->
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>O Gabinete</title>
+  <meta name="description" content="Grafo de similaridade de voto entre deputados federais, a partir das votações nominais da Câmara.">
+  <meta name="theme-color" content="#ffffff">
+  <script>
+    // Tema antes do CSS, para nao piscar o tema errado: a escolha salva
+    // (mesma chave do js/tema.js) ou, sem ela, a do sistema.
+    (function () {
+      var tema = null;
+      try { tema = localStorage.getItem('gabinete-tema'); } catch (e) {}
+      if (tema !== 'claro' && tema !== 'escuro') {
+        tema = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'escuro' : 'claro';
+      }
+      document.documentElement.dataset.tema = tema;
+    })();
+  </script>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%231d1f22'/%3E%3Cpath d='M10 11 22 9M10 11l10 11M22 9l-2 13' stroke='%23f4f4f2' stroke-width='1.6' opacity='.55'/%3E%3Ccircle cx='10' cy='11' r='4' fill='%23f4f4f2'/%3E%3Ccircle cx='22' cy='9' r='3' fill='%23f4f4f2'/%3E%3Ccircle cx='20' cy='22' r='4.5' fill='%23f4f4f2'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,600;8..60,700&display=swap">
+  <link rel="stylesheet" href="css/estilo.css">
+  <!-- Cytoscape.js 3.30.4 (licenca MIT), embutido para nao depender de CDN.
+       Origem: https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.30.4/cytoscape.min.js
+       sha512-xpXUCbrkyJCwC5noJXZqec9rSXdRgFfDoL7Q9/pCPe54Y04OlqwPobMcNuA5NPJ7DRR51OIr6xcOH2wUspyKDQ== -->
+  <script src="js/vendor/cytoscape.min.js" defer></script>
+  <script type="module" src="js/app.js"></script>
+</head>
+<body>
+  <a class="pular" href="#painel">Pular para o painel</a>
+
+  <header class="topo">
+    <a class="marca" href="./" aria-label="O Gabinete, início">
+      <svg class="marca-icone" viewBox="0 0 32 32" aria-hidden="true">
+        <path class="apagada" d="M10 11 22 9M10 11l10 11M22 9l-2 13" stroke="currentColor" stroke-width="1.6"/>
+        <circle cx="10" cy="11" r="4" fill="currentColor"/>
+        <circle class="apagada" cx="22" cy="9" r="3" fill="currentColor"/>
+        <circle cx="20" cy="22" r="4.5" fill="currentColor"/>
+      </svg>
+      <span class="marca-texto">
+        <span class="marca-nome">O Gabinete</span>
+        <span class="marca-sub">Quem vota com quem na Câmara</span>
+      </span>
+    </a>
+
+    <div class="controles">
+      <label class="campo campo-ano">
+        <span class="campo-rotulo">Ano</span>
+        <select id="seletor-ano" aria-label="Ano das votações"></select>
+      </label>
+
+      <div class="campo campo-busca">
+        <svg class="busca-icone" viewBox="0 0 20 20" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="m13 13 4.5 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        <input id="busca" type="search" autocomplete="off" spellcheck="false"
+               placeholder="Buscar deputado, partido ou UF"
+               role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="sugestoes"
+               aria-label="Buscar deputado por nome, partido ou UF">
+        <button id="busca-limpar" class="busca-limpar" type="button" aria-label="Limpar busca" hidden>×</button>
+        <kbd class="busca-atalho" aria-hidden="true">/</kbd>
+        <ul id="sugestoes" class="sugestoes" role="listbox" aria-label="Deputados encontrados" hidden></ul>
+      </div>
+
+      <button id="alternar-tema" class="botao-tema" type="button" aria-label="Alternar tema">
+        <svg class="icone-lua" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
+        <svg class="icone-sol" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <main class="palco">
+    <section class="area-grafo" aria-label="Grafo de similaridade de voto">
+      <div id="grafo" class="grafo"></div>
+
+      <div id="dica" class="dica" role="tooltip" hidden></div>
+
+      <div id="chip-partido" class="chip-partido" role="status" hidden></div>
+
+      <button id="voltar-grafo" class="chip-voltar" type="button" hidden>
+        <span aria-hidden="true">←</span> Voltar ao grafo completo
+      </button>
+
+      <div class="zoom" role="group" aria-label="Zoom do grafo">
+        <button id="zoom-mais" type="button" aria-label="Aproximar" data-dica="Aproximar">+</button>
+        <button id="zoom-menos" type="button" aria-label="Afastar" data-dica="Afastar">−</button>
+        <button id="zoom-ajustar" type="button" aria-label="Enquadrar grafo" data-dica="Enquadrar grafo">
+          <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 7V3h4M13 3h4v4M17 13v4h-4M7 17H3v-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        </button>
+      </div>
+
+      <p class="rodape-grafo">Role para aproximar · arraste para mover · clique num ponto para ver o deputado</p>
+
+      <div id="estado" class="estado carregando">
+        <div class="estado-cartao" role="status">
+          <span class="giro" aria-hidden="true"></span>
+          <p class="estado-texto">Carregando…</p>
+        </div>
+      </div>
+    </section>
+
+    <aside id="painel" class="painel" aria-labelledby="painel-titulo" tabindex="-1">
+      <button id="painel-alca" class="painel-alca" type="button" aria-expanded="false" aria-controls="painel-conteudo">
+        <span class="alca-barra" aria-hidden="true"></span>
+        <span id="painel-titulo" class="painel-titulo">Legenda e estatísticas</span>
+        <span class="alca-seta" aria-hidden="true"></span>
+      </button>
+      <div id="painel-conteudo" class="painel-conteudo"></div>
+    </aside>
+  </main>
+
+  <div id="aviso" class="aviso" role="status" aria-live="polite"></div>
+
+  <script>
+    // Aberto com duplo clique (file://), o navegador bloqueia o js/app.js
+    // (modulo) e a leitura dos JSONs. Em vez de tela em branco ou do erro
+    // generico, explica como abrir. Script comum, que roda mesmo assim.
+    if (location.protocol === 'file:') {
+      (function () {
+        var comando = 'python -m http.server';
+        // ano, busca e tema dependem do js/app.js, que nao carrega aqui
+        document.getElementById('seletor-ano').disabled = true;
+        document.getElementById('busca').disabled = true;
+        document.getElementById('alternar-tema').disabled = true;
+        document.body.classList.add('modo-arquivo');
+        var caixa = document.getElementById('estado');
+        caixa.className = 'estado erro';
+        caixa.hidden = false;
+        caixa.innerHTML =
+          '<div class="estado-cartao estado-arquivo" role="alert">' +
+            '<span class="estado-icone" aria-hidden="true">i</span>' +
+            '<h2 class="estado-titulo">Abra o protótipo por um endereço web</h2>' +
+            '<p class="estado-texto">O arquivo foi aberto direto do computador, e o navegador bloqueia ' +
+              'a leitura dos dados assim. Abra pelo link do <strong>ENTREGA.txt</strong> ou rode ' +
+              '<code>' + comando + '</code> nesta pasta e acesse <strong>http://localhost:8000</strong>.</p>' +
+            '<div class="comando">' +
+              '<code id="comando-servidor">' + comando + '</code>' +
+              '<button type="button" class="botao" id="copiar-comando">Copiar</button>' +
+            '</div>' +
+          '</div>';
+        var botao = document.getElementById('copiar-comando');
+        botao.addEventListener('click', function () {
+          var feito = function () { botao.textContent = 'Copiado!'; };
+          // o clipboard pode nao existir em file://; entao seleciona o texto
+          var selecionar = function () {
+            var faixa = document.createRange();
+            faixa.selectNodeContents(document.getElementById('comando-servidor'));
+            var selecao = window.getSelection();
+            selecao.removeAllRanges();
+            selecao.addRange(faixa);
+            try { if (document.execCommand('copy')) feito(); } catch (e) {}
+          };
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(comando).then(feito, selecionar);
+          } else {
+            selecionar();
+          }
+        });
+      })();
+    }
+  </script>
+</body>
+</html>
