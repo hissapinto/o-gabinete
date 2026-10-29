@@ -3,7 +3,9 @@
 > **TG1 – Definição do Produto de Software**
 > Laboratório de Engenharia de Software — Universidade Presbiteriana Mackenzie
 
-[![Testes da API](https://github.com/hissapinto/O_Gabinete/actions/workflows/testes-api.yml/badge.svg)](https://github.com/hissapinto/O_Gabinete/actions/workflows/testes-api.yml)
+[![Testes da API](https://github.com/hissapinto/o-gabinete/actions/workflows/testes-api.yml/badge.svg)](https://github.com/hissapinto/o-gabinete/actions/workflows/testes-api.yml)
+
+**Protótipo no ar:** <https://hissapinto.github.io/o-gabinete/web/prototipo/>
 
 ---
 
@@ -357,8 +359,13 @@ O_Gabinete/
 │   │   ├── rotas/              endpoints HTTP
 │   │   ├── servicos/           regras de negócio
 │   │   └── repositorios/       consultas SQL
-│   └── frontend/               interface web (Streamlit)
-│       └── app.py
+│   ├── frontend/               interface web (Streamlit)
+│   │   └── app.py
+│   └── prototipo/              protótipo de alta fidelidade, publicado no GitHub Pages
+│       ├── index.html
+│       ├── css/ e js/          interface; Cytoscape.js versionado em js/vendor/
+│       ├── dados/              JSONs estáticos no formato das rotas da API
+│       └── exportar_dados.py   gera esses JSONs a partir da API ou do grafo.txt
 ├── .env.example                modelo das variáveis do banco
 ├── docker-compose.yml          orquestração dos containers
 ├── README.md
@@ -374,12 +381,14 @@ O_Gabinete/
 | Estrutura de grafo | implementação própria (lista de adjacência) | camada de negócio |
 | Interface de terminal | biblioteca padrão | camada de apresentação |
 | Interface web | Streamlit | frontend da versão web |
+| Desenho do grafo no navegador | Cytoscape.js | protótipo de alta fidelidade |
 | API | FastAPI, servido por Uvicorn | backend da versão web |
 | Banco de dados | PostgreSQL 16, acessado com `psycopg` | versão web |
 | Containers | Docker e Docker Compose | versão web |
 | Ambiente de desenvolvimento | GitHub Codespaces (`.devcontainer`) | todo o projeto |
 | Testes | pytest | `web/api/tests/` (API) e `tests/` (aplicação de terminal) |
 | Integração contínua | GitHub Actions | `.github/workflows/` |
+| Publicação do protótipo | GitHub Pages | `web/prototipo/` |
 | Testes de contrato da API | coleção Postman, executável por Newman | `web/api/postman/` |
 | Fonte de dados | Portal de Dados Abertos da Câmara dos Deputados | pipeline |
 | Controle de versão | Git e GitHub | todo o projeto |
@@ -645,3 +654,63 @@ npx newman run web/api/postman/O_Gabinete.postman_collection.json
 ```
 
 Também é possível gerar uma coleção automaticamente a partir do contrato que o FastAPI publica, por **Import → Link** com `http://localhost:8000/openapi.json`. Essa versão traz as rotas e os parâmetros, mas sem nenhuma verificação: serve para explorar, não para testar.
+
+### 6.7 Protótipo publicado
+
+**<https://hissapinto.github.io/o-gabinete/web/prototipo/>**
+
+É o protótipo de alta fidelidade da disciplina de Interação Humano-Computador: o grafo de similaridade, a busca, o painel de perfil do deputado e o tema claro/escuro, abrindo no navegador sem instalar nada e sem subir container algum.
+
+#### Como ele funciona sem servidor
+
+O GitHub Pages serve apenas arquivos estáticos — não executa a API em FastAPI nem o frontend em Streamlit. O protótipo contorna isso lendo arquivos JSON cujos caminhos **imitam as rotas da API**:
+
+| Arquivo estático | Rota equivalente |
+|---|---|
+| `dados/anos.json` | `GET /anos` |
+| `dados/anos/2024/grafo.json` | `GET /anos/{ano}/grafo` |
+| `dados/anos/2024/deputados/{id}.json` | `GET /anos/{ano}/deputados/{id}` |
+
+O único acréscimo ao contrato é que cada nó do grafo carrega as coordenadas `x` e `y`, calculadas na exportação com o NetworkX, para o navegador abrir o grafo já desenhado e sempre igual.
+
+A consequência prática é que **o mesmo código de interface serve aos dois mundos**. Apontar o protótipo para a API de verdade são duas linhas em `web/prototipo/js/dados.js`:
+
+```js
+const BASE = 'dados';   // API real: 'http://localhost:8000'
+const SUFIXO = '.json'; // API real: ''
+```
+
+#### Como a publicação está configurada
+
+Em **Settings → Pages**, a origem é **Deploy from a branch**, com a branch `main` e a pasta `/(root)`. O Pages publica o repositório inteiro como está, então cada arquivo fica no endereço que corresponde ao seu caminho — e o protótipo, por morar em `web/prototipo/`, responde em `/o-gabinete/web/prototipo/`.
+
+A barra no fim do endereço importa: os caminhos do protótipo são todos relativos, e é ela que faz `css/`, `js/` e `dados/` resolverem a partir da pasta certa.
+
+Cada push na `main` republica o site. O andamento aparece na aba **Actions**, num job chamado *pages build and deployment* que o próprio GitHub dispara, e leva um ou dois minutos.
+
+Como não há `index.html` na raiz do repositório, a raiz do site (<https://hissapinto.github.io/o-gabinete/>) mostra este README renderizado pelo Jekyll. Nessa versão os dois diagramas Mermaid aparecem como texto, porque o Jekyll não os desenha sem configuração adicional — no GitHub.com eles continuam normais.
+
+#### Rodando o protótipo localmente
+
+```
+cd web/prototipo
+python -m http.server 8000
+```
+
+E abra <http://localhost:8000>.
+
+Abrir o `index.html` com um duplo clique **não funciona**: o navegador bloqueia as requisições `fetch` em páginas servidas por `file://`, e o protótipo carrega os dados justamente assim.
+
+#### Regerando os dados
+
+Os JSONs são um retrato de uma carga, e não se atualizam sozinhos quando o `pipeline/carga.py` roda de novo. Para gerá-los outra vez:
+
+```
+cd web/prototipo
+pip install -r requirements.txt
+python exportar_dados.py
+```
+
+O script tenta primeiro a API local, com os containers no ar, e salva as respostas como vieram — o que garante que os arquivos sigam o contrato real. Se a API não responder, ele recorre ao `dados/grafo.txt`, completando id e foto de cada deputado pela API de Dados Abertos da Câmara; quem não casar por nome e UF fica registrado em `relatorio_casamento.txt`.
+
+Detalhes do contrato dos JSONs e das decisões visuais estão em [`web/prototipo/README.md`](web/prototipo/README.md).
