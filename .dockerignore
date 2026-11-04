@@ -1,0 +1,16 @@
+# Vale so para builds com contexto na raiz (o pipeline/Dockerfile). A API e o
+# front tem contexto proprio (web/api, web/frontend) e nao leem este arquivo.
+.git
+.github
+.devcontainer
+.env
+**/__pycache__
+**/.venv
+**/venv
+**/.ipynb_checkpoints
+dados/
+docs/
+web/
+grafos/
+infra/
+pipeline/*.ipynb

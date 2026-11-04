@@ -1,0 +1,16 @@
+# Finais de linha. O .env com CRLF ja quebrou o compose (a senha chegava com
+# \r no fim); estes arquivos ficam sempre com LF, inclusive no Windows.
+* text=auto
+
+*.env*      text eol=lf
+.env*       text eol=lf
+*.sh        text eol=lf
+*.sql       text eol=lf
+*.py        text eol=lf
+*.js        text eol=lf
+*.css       text eol=lf
+*.html      text eol=lf
+*.yml       text eol=lf
+*.yaml      text eol=lf
+*.conf      text eol=lf
+Dockerfile  text eol=lf

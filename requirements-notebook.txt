@@ -1,0 +1,5 @@
+# Dependencias do pipeline/view-CSV.ipynb, exploracao dos CSVs fora do fluxo
+# do pipeline. Inclui as do pipeline (pandas, requests...) e acrescenta o
+# Jupyter, que fica fora do requirements.txt para nao pesar a imagem da carga.
+-r requirements.txt
+jupyter==1.1.1
