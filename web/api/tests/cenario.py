@@ -19,6 +19,11 @@ Sintese:
     ficou fora, quem nunca votou, ano com e sem execucao, e duas execucoes no
     mesmo ano para provar que vale a mais recente.
 
+    O layout segue a mesma ideia: a execucao atual tem posicao para todos os
+    nos, a antiga tem posicao diferente para Ana (se ela aparecer, a consulta
+    leu a execucao errada) e o ano de 2022 tem uma execucao em que Alberto
+    ficou sem posicao, para a rota do grafo acusar o layout ausente.
+
     Sobre os tres empatados em 60.00: com apenas dois, a ordem alfabetica
     coincidiria com a ordem por id crescente ou com a decrescente, e o teste
     do desempate passaria mesmo se o criterio fosse o id. Com tres, os ids
@@ -27,6 +32,8 @@ Sintese:
 
 Historico de alteracoes:
     21/10/2026 - Isabela - Criacao, junto da suite de testes do web/api.
+    04/11/2026 - Caio - Posicoes x/y (app.posicao) e o ano de 2022, com layout
+                        incompleto.
 """
 
 # --- deputados -------------------------------------------------------------
@@ -51,12 +58,17 @@ NOMES = {
 # --- anos ------------------------------------------------------------------
 ANO = 2024             # ano com grafo
 ANO_ANTERIOR = 2023    # tem execucao, mas nenhuma concordancia calculada
+ANO_SEM_LAYOUT = 2022  # tem grafo, mas Alberto ficou sem posicao
 ANO_SEM_EXECUCAO = 2019
+
+# Anos em /anos, do mais recente ao mais antigo.
+ANOS_COM_EXECUCAO = [ANO, ANO_ANTERIOR, ANO_SEM_LAYOUT]
 
 # --- execucoes -------------------------------------------------------------
 EXECUCAO_ANTIGA = 1    # 2024, dados propositalmente errados
 EXECUCAO_ATUAL = 2     # 2024, a que vale (maior execucao_id)
 EXECUCAO_2023 = 3
+EXECUCAO_SEM_LAYOUT = 4  # 2022
 
 # --- numeros que decorrem dos votos abaixo ---------------------------------
 # par (menor_id, maior_id): (votacoes_em_comum, concordancias, percentual)
@@ -87,6 +99,18 @@ NOS_DO_GRAFO = [ALBERTO, ANA, BEATRIZ, BRUNO, CARLA]
 
 # Arestas de 2024, na ordem (deputado_a, deputado_b) que a consulta usa.
 ARESTAS_DO_GRAFO = [(ANA, BEATRIZ), (ANA, BRUNO), (ANA, CARLA), (ANA, ALBERTO)]
+
+# Posicao (x, y) de cada no de 2024 na execucao atual. Valores com casa
+# decimal e negativos, como os que o layout grava.
+POSICOES = {
+    ALBERTO: (-120.5, 40.0),
+    ANA:     (0.0, 0.0),
+    BEATRIZ: (85.3, -60.7),
+    BRUNO:   (210.0, 15.2),
+    CARLA:   (-30.1, 190.4),
+}
+# Posicao de Ana na execucao antiga, que nao pode vazar.
+POSICAO_ANTIGA_DE_ANA = (999.0, 999.0)
 
 
 SQL = """
@@ -136,8 +160,9 @@ INSERT INTO app.execucao
  (execucao_id, ano_inicio, ano_fim, minimo_votacoes_em_comum, k_vizinhos, concordancia_minima) VALUES
  (1, 2024, 2024, 3, 5, 75),
  (2, 2024, 2024, 3, 5, 75),
- (3, 2023, 2023, 3, 5, 75);
-SELECT setval('app.execucao_execucao_id_seq', 3);
+ (3, 2023, 2023, 3, 5, 75),
+ (4, 2022, 2022, 3, 5, 75);
+SELECT setval('app.execucao_execucao_id_seq', 4);
 
 -- Execucao antiga: numeros errados de proposito. Se algum teste enxergar
 -- 100.00 no par Ana/Bruno, o endpoint leu a execucao errada.
@@ -163,4 +188,22 @@ INSERT INTO app.aresta (execucao_id, deputado_a, deputado_b, peso) VALUES
  (2, 100, 200, 33),
  (2, 100, 300, 44),
  (2, 100, 600, 55);
+
+-- Layout. A execucao 1 tem Ana em outro lugar: se a rota mostrar 999, leu a
+-- execucao errada. A execucao 4 (2022) tem um par, mas so Ana tem posicao;
+-- Alberto ficou sem, e a rota do grafo de 2022 tem de acusar o layout ausente.
+INSERT INTO app.posicao (execucao_id, deputado_id, x, y) VALUES
+ (1, 100, 999.0, 999.0),
+ (2, 600, -120.5, 40.0),
+ (2, 100, 0.0, 0.0),
+ (2, 150, 85.3, -60.7),
+ (2, 200, 210.0, 15.2),
+ (2, 300, -30.1, 190.4),
+ (4, 100, 10.0, 10.0);
+
+INSERT INTO app.concordancia
+ (execucao_id, deputado_a, deputado_b, votacoes_em_comum, concordancias) VALUES
+ (4, 100, 600, 5, 3);
+INSERT INTO app.aresta (execucao_id, deputado_a, deputado_b, peso) VALUES
+ (4, 100, 600, 60);
 """

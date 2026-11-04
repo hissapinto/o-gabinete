@@ -12,6 +12,7 @@ Sintese:
 
 Historico de alteracoes:
     21/10/2026 - Isabela - Criacao, junto da suite de testes do web/api.
+    04/11/2026 - Caio - Anos do cenario lidos de cenario.ANOS_COM_EXECUCAO.
 """
 
 from tests import cenario
@@ -22,5 +23,5 @@ def test_lista_os_anos_com_execucao(cliente):
 
     assert resposta.status_code == 200
     assert resposta.json() == {
-        "anos": [{"ano": cenario.ANO}, {"ano": cenario.ANO_ANTERIOR}]
+        "anos": [{"ano": ano} for ano in cenario.ANOS_COM_EXECUCAO]
     }

@@ -9,11 +9,12 @@ Integrantes:
 
 Sintese:
     Consultas que montam o grafo de uma execucao: os vertices (deputados que
-    aparecem em algum par de concordancia) e as arestas (os k vizinhos mais
-    parecidos de cada um, gravados pelo pipeline).
+    aparecem em algum par de concordancia, com a posicao x/y do desenho) e as
+    arestas (os k vizinhos mais parecidos de cada um, gravados pelo pipeline).
 
 Historico de alteracoes:
     19/10/2026 - Isabela - Criacao, para o endpoint GET /anos/{ano}/grafo.
+    04/11/2026 - Caio - Nos trazem x e y de app.posicao, da mesma execucao.
 """
 
 
@@ -22,12 +23,18 @@ def listar_nos(conexao, execucao_id):
     Deputados que entraram no grafo da execucao: os que aparecem em algum par
     de app.concordancia, de qualquer um dos dois lados. Sem url_foto, que so
     a ficha do deputado usa.
+
+    x e y vem de app.posicao da mesma execucao. O LEFT JOIN e de proposito:
+    no sem posicao volta com x e y nulos em vez de sumir do grafo, e a camada
+    de servico decide o que fazer com isso.
     """
     with conexao.cursor() as cursor:
         cursor.execute(
             """
-            SELECT d.deputado_id, d.nome, d.sigla_partido, d.sigla_uf
+            SELECT d.deputado_id, d.nome, d.sigla_partido, d.sigla_uf, p.x, p.y
             FROM app.deputado d
+            LEFT JOIN app.posicao p ON p.execucao_id = %(execucao_id)s
+                                   AND p.deputado_id = d.deputado_id
             WHERE d.deputado_id IN (
                 SELECT deputado_a FROM app.concordancia WHERE execucao_id = %(execucao_id)s
                 UNION

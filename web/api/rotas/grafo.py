@@ -10,38 +10,39 @@ Integrantes:
 Sintese:
     Rota GET /anos/{ano}/grafo, que alimenta a tela inicial inteira: o grafo,
     a legenda e as estatisticas saem desta resposta, para os numeros da tela
-    baterem entre si.
+    baterem entre si. Cada no traz x e y, o layout calculado pelo pipeline.
 
 Historico de alteracoes:
     19/10/2026 - Isabela - Criacao.
+    04/11/2026 - Caio - Regra movida para servicos/grafo.py; nos com x e y,
+                        e 500 quando falta o layout.
 """
 
 import psycopg
 from fastapi import APIRouter, HTTPException
 
 from banco import conectar
-from repositorios.execucao import buscar_execucao_mais_recente
-from repositorios.grafo import listar_nos, listar_arestas
+from servicos.erros import LayoutAusente, NaoEncontrado
+from servicos.grafo import obter_grafo
 
 router = APIRouter()
 
 
 @router.get("/anos/{ano}/grafo")
-def obter_grafo(ano: int):
+def obter_grafo_do_ano(ano: int):
     """
     Grafo de similaridade do ano, sempre da execucao mais recente:
-    os deputados que entraram no grafo e as arestas entre eles.
-    Ano sem execucao devolve 404.
+    os deputados que entraram no grafo, com a posicao x/y de cada um no
+    desenho, e as arestas entre eles.
+    Ano sem execucao devolve 404. No sem posicao devolve 500, porque e falha
+    da carga e nao do pedido.
     """
     try:
         with conectar() as conexao:
-            execucao_id = buscar_execucao_mais_recente(conexao, ano)
-            if execucao_id is None:
-                raise HTTPException(status_code=404, detail=f"Nao ha grafo para {ano}")
-
-            nos = listar_nos(conexao, execucao_id)
-            arestas = listar_arestas(conexao, execucao_id)
+            return obter_grafo(conexao, ano)
+    except NaoEncontrado as erro:
+        raise HTTPException(status_code=404, detail=str(erro))
+    except LayoutAusente as erro:
+        raise HTTPException(status_code=500, detail=str(erro))
     except psycopg.Error as erro:
         raise HTTPException(status_code=503, detail=f"Banco indisponivel: {erro}")
-
-    return {"ano": ano, "nos": nos, "arestas": arestas}

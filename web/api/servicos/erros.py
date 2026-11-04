@@ -13,8 +13,13 @@ Sintese:
 
 Historico de alteracoes:
     17/10/2026 - Caio - Criacao.
+    04/11/2026 - Caio - LayoutAusente, para o grafo sem posicao dos nos.
 """
 
 
 class NaoEncontrado(Exception):
     """O recurso pedido nao existe (ano sem grafo, deputado que nao votou no ano)."""
+
+
+class LayoutAusente(Exception):
+    """O grafo existe, mas algum no nao tem posicao gravada (carga antiga ou incompleta)."""

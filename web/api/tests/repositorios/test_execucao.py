@@ -14,6 +14,7 @@ Sintese:
 
 Historico de alteracoes:
     21/10/2026 - Isabela - Criacao, junto da suite de testes do web/api.
+    04/11/2026 - Caio - Anos do cenario lidos de cenario.ANOS_COM_EXECUCAO.
 """
 
 from repositorios.execucao import buscar_execucao_mais_recente, listar_anos_disponiveis
@@ -22,8 +23,7 @@ from tests import cenario
 
 def test_lista_anos_do_mais_recente_ao_mais_antigo(conexao):
     assert listar_anos_disponiveis(conexao) == [
-        {"ano": cenario.ANO},
-        {"ano": cenario.ANO_ANTERIOR},
+        {"ano": ano} for ano in cenario.ANOS_COM_EXECUCAO
     ]
 
 

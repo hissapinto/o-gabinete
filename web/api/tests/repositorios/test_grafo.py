@@ -9,11 +9,13 @@ Integrantes:
 
 Sintese:
     Testes de repositorios/grafo.py: os nos saem de app.concordancia, de
-    qualquer um dos dois lados do par, e as arestas saem de app.aresta mas
-    com o percentual vindo de app.concordancia pelo JOIN.
+    qualquer um dos dois lados do par, com x e y de app.posicao da mesma
+    execucao, e as arestas saem de app.aresta mas com o percentual vindo de
+    app.concordancia pelo JOIN.
 
 Historico de alteracoes:
     21/10/2026 - Isabela - Criacao, junto da suite de testes do web/api.
+    04/11/2026 - Caio - Testes da posicao x/y dos nos.
 """
 
 from repositorios.grafo import listar_arestas, listar_nos
@@ -41,11 +43,42 @@ def test_deputado_fora_de_qualquer_par_nao_e_no(conexao):
     assert cenario.ELENA not in ids, "Elena nunca votou"
 
 
-def test_no_traz_partido_e_uf_mas_nao_a_foto(conexao):
+def test_no_traz_partido_uf_e_posicao_mas_nao_a_foto(conexao):
     """A foto so e usada na ficha; o grafo nao a carrega."""
     no = listar_nos(conexao, cenario.EXECUCAO_ATUAL)[0]
 
-    assert set(no) == {"deputado_id", "nome", "sigla_partido", "sigla_uf"}
+    assert set(no) == {"deputado_id", "nome", "sigla_partido", "sigla_uf", "x", "y"}
+
+
+def test_no_traz_a_posicao_da_execucao(conexao):
+    posicoes = {
+        no["deputado_id"]: (no["x"], no["y"])
+        for no in listar_nos(conexao, cenario.EXECUCAO_ATUAL)
+    }
+
+    assert posicoes == cenario.POSICOES
+
+
+def test_posicao_de_outra_execucao_nao_vaza(conexao):
+    """A execucao antiga guarda Ana em (999, 999); a atual, nao."""
+    ana = next(no for no in listar_nos(conexao, cenario.EXECUCAO_ATUAL)
+               if no["deputado_id"] == cenario.ANA)
+
+    assert (ana["x"], ana["y"]) != cenario.POSICAO_ANTIGA_DE_ANA
+    assert (ana["x"], ana["y"]) == cenario.POSICOES[cenario.ANA]
+
+
+def test_no_sem_posicao_continua_no_grafo_com_x_e_y_nulos(conexao):
+    """
+    O LEFT JOIN nao some com o no: quem decide o erro e o servico. Na
+    execucao de 2022, Alberto ficou sem posicao.
+    """
+    por_id = {no["deputado_id"]: no for no in listar_nos(conexao, cenario.EXECUCAO_SEM_LAYOUT)}
+
+    assert set(por_id) == {cenario.ANA, cenario.ALBERTO}
+    assert por_id[cenario.ALBERTO]["x"] is None
+    assert por_id[cenario.ALBERTO]["y"] is None
+    assert por_id[cenario.ANA]["x"] is not None
 
 
 def test_cada_deputado_aparece_uma_vez_so(conexao):
