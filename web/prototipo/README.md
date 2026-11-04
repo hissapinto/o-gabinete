@@ -1,5 +1,7 @@
 # O Gabinete: protótipo de alta fidelidade (IHC, Parte 3)
 
+> **Versão congelada para IHC; o front ativo está em `web/frontend/`.**
+
 Protótipo funcional da tela principal do O Gabinete, evoluído do esboço de baixa fidelidade (`docs/ihc/prototipo_baixa_fidelidade.jpeg`). É uma página estática feita com HTML, CSS e JavaScript puro, sem framework e sem build. O grafo é desenhado com [Cytoscape.js](https://js.cytoscape.org/) 3.30.4 (licença MIT), embutido em `js/vendor/cytoscape.min.js` (cópia do cdnjs, conferida pelo hash SRI que aparece no comentário do `index.html`). Os dados vêm de JSONs estáticos no mesmo formato da API.
 
 ## Como rodar localmente

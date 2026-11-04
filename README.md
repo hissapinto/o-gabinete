@@ -259,7 +259,7 @@ flowchart LR
 A arquitetura segue o **padrão em camadas** e tem duas formas de execução, que compartilham o mesmo pipeline de dados:
 
 - **Aplicação de terminal** (Teoria dos Grafos): o arquivo `dados/grafo.txt` funciona como **contrato explícito** entre o pipeline de ingestão e a aplicação. O pipeline é um subsistema executado offline, que produz um artefato; a aplicação consome esse artefato e não conhece a fonte de dados. Decisão registrada em [`docs/adr/arquitetura_em_camadas.md`](docs/adr/arquitetura_em_camadas.md).
-- **Versão web** (Laboratório de Engenharia de Software): três serviços em containers, orquestrados por Docker Compose e executados no GitHub Codespaces. O frontend em Streamlit consome uma API em FastAPI, que consulta um banco PostgreSQL. Decisão registrada em [`docs/adr/introducao_banco_de_dados.md`](docs/adr/introducao_banco_de_dados.md).
+- **Versão web** (Laboratório de Engenharia de Software): três serviços em containers, mais um serviço de uso único que roda a carga, orquestrados por Docker Compose e executados no GitHub Codespaces. Na nuvem, a API e a interface ficam no Render e o banco no Neon, todos no plano gratuito ([`docs/DEPLOY.md`](docs/DEPLOY.md)). O frontend, em HTML, CSS e JavaScript com Cytoscape.js, é servido por um nginx que repassa `/api/` para uma API em FastAPI, que consulta um banco PostgreSQL. Decisões registradas em [`docs/adr/introducao_banco_de_dados.md`](docs/adr/introducao_banco_de_dados.md) e [`docs/adr/frontend_cytoscape.md`](docs/adr/frontend_cytoscape.md).
 
 ```mermaid
 flowchart TB
@@ -270,6 +270,7 @@ flowchart TB
         B2["processamento.py<br/>limpeza e filtro de mérito"]
         C["similaridade.py<br/>concordância de votos"]
         D["gerar_grafo.py<br/>5 vizinhos mais parecidos"]
+        L["layout.py<br/>posição x/y (NetworkX)"]
         I["carga.py<br/>reusa as regras e grava no banco"]
     end
 
@@ -282,7 +283,7 @@ flowchart TB
     end
 
     subgraph Web["Versão web (Docker Compose)"]
-        W1["Frontend<br/>Streamlit · porta 8501"]
+        W1["Frontend<br/>nginx · HTML/JS + Cytoscape · porta 8501"]
         W2["Backend<br/>FastAPI · porta 8000"]
         W3[("Banco de dados<br/>PostgreSQL 16 · porta 5432")]
     end
@@ -291,16 +292,17 @@ flowchart TB
 
     A --> B --> B2 --> C --> D --> E
     D --> I --> W3
+    L --> I
     E --> F --> G --> H --> Usuario
-    Usuario --> W1 -->|HTTP / JSON| W2 -->|SQL| W3
+    Usuario --> W1 -->|"/api/ (proxy) · JSON"| W2 -->|SQL| W3
 ```
 
 ### 6.2 Descrição das camadas
 
 | Camada | Módulos | Responsabilidade |
 |---|---|---|
-| **Pipeline** (subsistema offline) | `pipeline/coleta.py`, `pipeline/processamento.py`, `pipeline/similaridade.py`, `pipeline/gerar_grafo.py`, `pipeline/carga.py` | Baixar os CSVs, filtrar as votações de mérito, calcular a concordância entre deputados, gerar o arquivo do grafo e carregar o banco da versão web. Único lugar onde `pandas` e `numpy` são utilizados. |
-| **Apresentação** | `grafos/apresentacao/menu.py` (terminal), `web/frontend/app.py` (web) | Interação com o usuário, em duas formas: menu de terminal e interface web. |
+| **Pipeline** (subsistema offline) | `pipeline/coleta.py`, `pipeline/processamento.py`, `pipeline/similaridade.py`, `pipeline/gerar_grafo.py`, `pipeline/layout.py`, `pipeline/carga.py` | Baixar os CSVs, filtrar as votações de mérito, calcular a concordância entre deputados, gerar o arquivo do grafo, calcular a posição de cada vértice no desenho e carregar o banco da versão web. Único lugar onde `pandas`, `numpy` e `networkx` são utilizados. |
+| **Apresentação** | `grafos/apresentacao/menu.py` (terminal), `web/frontend/` (web: `index.html`, `css/`, `js/`) | Interação com o usuário, em duas formas: menu de terminal e interface web. Na web, `js/dados.js` é o único módulo que chama a API. |
 | **Negócio** | `grafos/negocio/grafo.py`, `grafos/negocio/grafoLista.py`, `grafos/negocio/logica_grafos.py` | Estrutura do grafo (lista de adjacência, a partir da classe apresentada em aula) e algoritmos de análise, entre eles a conexidade. |
 | **API** (versão web) | `web/api/` (`main.py`, `banco.py`, `rotas/`, `servicos/`, `repositorios/`) | Endpoints REST em FastAPI. Dividida internamente: `rotas/` recebe o HTTP, `servicos/` aplica a regra de negócio, `repositorios/` executa o SQL e `banco.py` é o único módulo que conhece a `DATABASE_URL`. |
 | **Persistência** | `grafos/persistencia/persistencia.py` | Leitura e gravação do arquivo `grafo.txt`, encapsulando o conhecimento do formato. |
@@ -312,7 +314,7 @@ A dependência aponta sempre para baixo, e as camadas são fechadas: a apresenta
 
 **Consequência prática.** A aplicação de terminal não depende de rede, de Docker, de `pandas` nem de bibliotecas externas de grafos: basta clonar o repositório e executar `python grafos/main.py`. Se o portal estiver indisponível no momento da demonstração, o comportamento não muda, pois o `grafo.txt` está versionado. A versão web, por outro lado, exige Docker, que já vem configurado no Codespaces.
 
-**Modelo de dados atual.** O banco tem oito tabelas, divididas em dois blocos. Os dados da Câmara ficam em `deputado`, `proposicao`, `votacao`, `votacao_proposicao` e `voto`; os resultados do pipeline, em `execucao`, `concordancia` e `aresta`. Cada execução do `carga.py` registra em `app.execucao` os parâmetros usados (ano, mínimo de votações em comum, número de vizinhos e concordância mínima), de modo que versões diferentes do grafo podem conviver no banco e ser comparadas. As arestas gravadas são as mesmas do `grafo.txt`, porque a carga passa pelas funções do `similaridade.py` e do `gerar_grafo.py`.
+**Modelo de dados atual.** O banco tem nove tabelas, divididas em dois blocos. Os dados da Câmara ficam em `deputado`, `proposicao`, `votacao`, `votacao_proposicao` e `voto`; os resultados do pipeline, em `execucao`, `concordancia`, `aresta` e `posicao` (a posição x/y de cada vértice no desenho, chaveada pela execução, como as arestas). Cada execução do `carga.py` registra em `app.execucao` os parâmetros usados (ano, mínimo de votações em comum, número de vizinhos e concordância mínima), de modo que versões diferentes do grafo podem conviver no banco e ser comparadas. As arestas gravadas são as mesmas do `grafo.txt`, porque a carga passa pelas funções do `similaridade.py` e do `gerar_grafo.py`.
 
 **Endpoints da API.** A versão web expõe seis rotas, todas `GET` e todas devolvendo JSON. As duas primeiras não dependem do pipeline; as demais leem sempre a execução mais recente do ano pedido.
 
@@ -321,7 +323,7 @@ A dependência aponta sempre para baixo, e as camadas são fechadas: a apresenta
 | `/health` | — | confirma que a API está no ar, sem tocar no banco | — |
 | `/deputados` | — | todos os deputados cadastrados, em ordem alfabética | 503 se o banco estiver fora |
 | `/anos` | — | anos com grafo disponível, do mais recente ao mais antigo | — |
-| `/anos/{ano}/grafo` | — | nós e arestas da tela inicial | 404 se o ano não tem execução |
+| `/anos/{ano}/grafo` | — | nós (cada um com a posição `x`/`y` do desenho) e arestas da tela inicial | 404 se o ano não tem execução; 500 se algum nó não tem posição gravada ("layout ausente", rode a carga) |
 | `/anos/{ano}/deputados/{id}` | `limite` (1 a 50, padrão 10) | ficha do deputado e os mais similares a ele | 404 se o ano não tem execução ou se ele não votou no ano; 200 com lista vazia se votou mas ficou fora do grafo |
 | `/anos/{ano}/concordancias/{a}/{b}` | `tipo` (`todas`, `concordancia`, `divergencia`), `limite` (sem limite por padrão), `offset` | contadores do par e as votações em que concordaram e divergiram, em duas listas | 422 se os dois ids forem iguais; 404 se o ano não tem execução ou se algum deles não votou; `status: "insuficiente"` se o par não tem concordância calculada |
 
@@ -365,7 +367,9 @@ o-gabinete/
 │   ├── processamento.py
 │   ├── similaridade.py
 │   ├── gerar_grafo.py
+│   ├── layout.py               posição x/y dos vértices (ForceAtlas2, NetworkX)
 │   ├── carga.py                carga do banco da versão web
+│   ├── Dockerfile              imagem do serviço carga do compose
 │   └── view-CSV.ipynb          exploração dos CSVs, fora do fluxo do pipeline
 ├── web/
 │   ├── api/                    backend da versão web (FastAPI)
@@ -376,17 +380,24 @@ o-gabinete/
 │   │   ├── repositorios/       consultas SQL
 │   │   ├── tests/              suíte automatizada, espelhando as camadas
 │   │   └── postman/            coleção de testes de contrato
-│   ├── frontend/               interface web (Streamlit)
-│   │   └── app.py
-│   └── prototipo/              protótipo de alta fidelidade, publicado no GitHub Pages
+│   ├── frontend/               interface web (nginx), lê a API por /api/
+│   │   ├── index.html
+│   │   ├── css/ e js/          cópia da interface do protótipo; Cytoscape.js em js/vendor/
+│   │   ├── nginx.conf          estáticos e proxy /api/ para o backend
+│   │   └── Dockerfile
+│   └── prototipo/              protótipo de IHC congelado, publicado no GitHub Pages
 │       ├── index.html
 │       ├── css/ e js/          interface; Cytoscape.js versionado em js/vendor/
 │       ├── dados/              JSONs estáticos no formato das rotas da API
 │       └── exportar_dados.py   gera esses JSONs a partir da API ou do grafo.txt
 ├── .env.example                modelo das variáveis do banco
+├── .gitattributes              força LF nos arquivos de texto (.env, .sql, .py...)
+├── .dockerignore               contexto do build do pipeline/Dockerfile
 ├── docker-compose.yml          orquestração dos containers
+├── render.yaml                 Blueprint do Render (API e interface)
 ├── README.md
-└── requirements.txt
+├── requirements.txt            dependências do pipeline
+└── requirements-notebook.txt   pipeline + Jupyter, para o view-CSV.ipynb
 ```
 
 ### 6.4 Tecnologias
@@ -395,10 +406,11 @@ o-gabinete/
 |---|---|---|
 | Linguagem | Python 3 | todo o projeto |
 | Ingestão e tratamento de dados | `requests`, `pandas`, `numpy` | apenas no pipeline |
+| Layout do grafo (posição dos vértices) | NetworkX (ForceAtlas2) | apenas no pipeline (`pipeline/layout.py`) |
 | Estrutura de grafo | implementação própria (lista de adjacência) | camada de negócio |
 | Interface de terminal | biblioteca padrão | camada de apresentação |
-| Interface web | Streamlit | frontend da versão web |
-| Desenho do grafo no navegador | Cytoscape.js | protótipo de alta fidelidade |
+| Interface web | HTML, CSS e JavaScript puro, servidos por nginx | frontend da versão web |
+| Desenho do grafo no navegador | Cytoscape.js | frontend da versão web e protótipo de alta fidelidade |
 | API | FastAPI, servido por Uvicorn | backend da versão web |
 | Banco de dados | PostgreSQL 16, acessado com `psycopg` | versão web |
 | Containers | Docker e Docker Compose | versão web |
@@ -417,7 +429,9 @@ O projeto tem duas aplicações independentes, com preparações diferentes:
 | Aplicação | O que exige | Passos |
 |---|---|---|
 | Terminal (Teoria dos Grafos) | Python 3 | 1, e depois "Aplicação de terminal" |
-| Web (Lab. de Engenharia de Software) | Python 3 e Docker | 1 a 5 |
+| Web (Lab. de Engenharia de Software) | Docker | 2, 3 e 5 (a carga do passo 4 é automática) |
+
+Para publicar na nuvem (Render + Neon), siga o [`docs/DEPLOY.md`](docs/DEPLOY.md).
 
 No GitHub Codespaces nada precisa ser instalado: o `.devcontainer` já traz Python, Docker e o `.env` prontos.
 
@@ -435,7 +449,9 @@ No Linux, para usar o `docker` sem `sudo`: `sudo usermod -aG docker $USER` e rea
 
 O venv é uma pasta com um Python isolado e os pacotes do projeto dentro dela. Serve para que as versões fixadas no `requirements.txt` (pandas 3.0.5, psycopg 3.2.13) não conflitem com o que já estiver instalado na máquina para outras matérias.
 
-Ele é necessário para o `pipeline/carga.py` e para a aplicação de terminal, que rodam na sua máquina. A API, o banco e o frontend rodam dentro dos containers e carregam as próprias dependências — o venv não os afeta.
+Ele é necessário para a aplicação de terminal e para rodar o pipeline fora dos containers (por exemplo, a carga contra o Neon no deploy). A API, o banco, o frontend e a carga do compose rodam dentro dos containers e carregam as próprias dependências — o venv não os afeta.
+
+O `requirements.txt` traz só o que o pipeline usa. Para abrir o notebook `pipeline/view-CSV.ipynb`, instale também o Jupyter: `pip install -r requirements-notebook.txt` (inclui o `requirements.txt`).
 
 Todos os comandos abaixo são executados na raiz do projeto.
 
@@ -513,33 +529,35 @@ Depois abra o `.env` e substitua `SENHA_AQUI` por uma senha qualquer — o banco
 docker compose up -d
 ```
 
-Sobem três serviços: o banco na porta 5432, a API na 8000 e o frontend na 8501. O `-d` devolve o terminal; sem ele, os logs ocupam a janela.
+Os serviços sobem nesta ordem: o banco (porta 5432); a **carga**, que grava o grafo e termina; a API (porta 8000), que só sobe depois que a carga terminou com sucesso; e o frontend (porta 8501). O `-d` devolve o terminal; sem ele, os logs ocupam a janela.
 
-Confirme que a API respondeu antes de prosseguir:
+Na primeira vez, a carga baixa cerca de 75 MB de CSVs da Câmara e leva alguns minutos; acompanhe com `docker compose logs -f carga`. Confirme que a API respondeu:
 
 ```
 curl localhost:8000/health
 ```
 
-#### Passo 4 — Carga dos dados
+#### Passo 4 — Carga dos dados (automática)
 
-Com os containers no ar, o venv ativo e **de dentro da pasta `pipeline/`**:
+O serviço `carga` do compose roda o `pipeline/carga.py` a cada `docker compose up`. O script baixa os CSVs do ano de referência, filtra as votações de mérito, calcula a concordância entre os deputados e a posição de cada um no desenho do grafo (cerca de 20 segundos) e grava tudo no banco em uma única transação.
+
+- **Não repete trabalho.** Se a execução mais recente do ano já tem o layout gravado, a carga imprime `2024 ja carregado (...). Pulando` e termina na hora, sem baixar nada. Os CSVs ficam em `dados/brutos/` (volume), e um arquivo que já existe completo não é baixado de novo.
+- **Recarregar de propósito:** `FORCAR_CARGA=1 docker compose up carga`. Cada recarga registra uma execução nova em `app.execucao`; as votações do ano são substituídas, sem duplicar.
+- **Se falhar** (por exemplo, o site da Câmara fora do ar), o log mostra `ERRO na carga de 2024: ...`, nada é gravado e a API não sobe. Veja com `docker compose logs carga` e rode `docker compose up` de novo.
+
+A carga também roda fora do compose, com o venv ativo e **de dentro da pasta `pipeline/`** (`cd pipeline && python carga.py`). A pasta importa: o `carga.py` carrega os módulos vizinhos por nome simples (`from coleta import ...`). Sem `DATABASE_URL`, ele usa o banco do `.env` em `localhost`; com `DATABASE_URL`, usa o banco dela — é assim que se carrega o Neon no deploy.
+
+**Banco criado antes da tabela `app.posicao`.** O `01-schema.sql` só roda com o volume vazio. Num banco que já existe, a carga falha com "Falta tabela no banco". Crie a tabela e suba de novo (ou recomece do zero com `docker compose down -v`):
 
 ```
-cd pipeline
-python carga.py
-cd ..
+docker compose exec database psql -U gabinete -d gabinete -c "CREATE TABLE app.posicao (execucao_id INTEGER REFERENCES app.execucao (execucao_id) ON DELETE CASCADE, deputado_id INTEGER REFERENCES app.deputado (deputado_id), x DOUBLE PRECISION NOT NULL, y DOUBLE PRECISION NOT NULL, PRIMARY KEY (execucao_id, deputado_id));"
 ```
-
-A pasta importa: o `carga.py` carrega os módulos vizinhos por nome simples (`from coleta import ...`), o que só funciona quando ele é o ponto de entrada da própria pasta.
-
-O script baixa os CSVs do ano de referência, filtra as votações de mérito, calcula a concordância entre os deputados e grava tudo no banco em uma única transação. A primeira execução leva alguns minutos, por causa do download. Rodar de novo não duplica os dados: as votações do ano são substituídas, e uma execução nova é registrada em `app.execucao`.
 
 #### Passo 5 — Acessar
 
 | Endereço | O que é |
 |---|---|
-| `http://localhost:8501` | frontend em Streamlit |
+| `http://localhost:8501` | interface web (nginx), que lê a API por `http://localhost:8501/api/` |
 | `http://localhost:8000/docs` | documentação interativa da API, gerada pelo FastAPI |
 | `http://localhost:8000/health` | confirma que o backend está no ar |
 
@@ -557,6 +575,8 @@ python grafos/main.py
 |---|---|
 | `docker compose ps` | lista os serviços no ar |
 | `docker compose logs -f backend` | acompanha os logs da API |
+| `docker compose logs carga` | mostra o que a carga fez (ou por que falhou) |
+| `FORCAR_CARGA=1 docker compose up carga` | recarrega o ano mesmo já carregado |
 | `docker compose restart backend` | recarrega a API |
 | `docker compose down` | para tudo, preservando os dados do banco |
 | `docker compose down -v` | para tudo e **apaga o banco** |
@@ -575,6 +595,8 @@ python grafos/main.py
 | `port is already allocated` | outro processo ocupa 5432, 8000 ou 8501 | pare o processo, ou derrube os containers de outro projeto |
 | `password authentication failed` | o volume do banco foi criado com credenciais diferentes das do `.env` atual | `docker compose down -v` e suba de novo |
 | `ModuleNotFoundError: No module named 'pandas'` | venv inativo, ou `pip install` não executado | passo 1 |
+| `service "carga" didn't complete successfully` | a carga falhou (Câmara fora do ar, tabela faltando...) | `docker compose logs carga` mostra o motivo; corrija e suba de novo |
+| senha recusada mesmo com o `.env` certo, ou `\r` no fim de uma variável | `.env` salvo com CRLF no Windows | salve com LF (o `.gitattributes` já força LF nos arquivos versionados) |
 
 ### 6.6 Testes automatizados
 
@@ -682,7 +704,7 @@ Também é possível gerar uma coleção automaticamente a partir do contrato qu
 
 #### Como ele funciona sem servidor
 
-O GitHub Pages serve apenas arquivos estáticos — não executa a API em FastAPI nem o frontend em Streamlit. O protótipo contorna isso lendo arquivos JSON cujos caminhos **imitam as rotas da API**:
+O GitHub Pages serve apenas arquivos estáticos — não executa a API em FastAPI nem o nginx que a repassa ao frontend. O protótipo contorna isso lendo arquivos JSON cujos caminhos **imitam as rotas da API**:
 
 | Arquivo estático | Rota equivalente |
 |---|---|
@@ -690,14 +712,9 @@ O GitHub Pages serve apenas arquivos estáticos — não executa a API em FastAP
 | `dados/anos/2024/grafo.json` | `GET /anos/{ano}/grafo` |
 | `dados/anos/2024/deputados/{id}.json` | `GET /anos/{ano}/deputados/{id}` |
 
-O único acréscimo ao contrato é que cada nó do grafo carrega as coordenadas `x` e `y`, calculadas na exportação com o NetworkX, para o navegador abrir o grafo já desenhado e sempre igual.
+Cada nó do grafo carrega as coordenadas `x` e `y`, calculadas na exportação com o NetworkX, para o navegador abrir o grafo já desenhado e sempre igual. Hoje esses campos fazem parte do contrato da própria API: o `pipeline/layout.py` aplica o mesmo cálculo e a carga grava o resultado em `app.posicao`.
 
-A consequência prática é que **o mesmo código de interface serve aos dois mundos**. Apontar o protótipo para a API de verdade são duas linhas em `web/prototipo/js/dados.js`:
-
-```js
-const BASE = 'dados';   // API real: 'http://localhost:8000'
-const SUFIXO = '.json'; // API real: ''
-```
+O protótipo está **congelado para a avaliação de IHC**. A interface ativa é uma cópia dele em `web/frontend/`, que lê a API pelo proxy `/api/` do nginx (decisão em [`docs/adr/frontend_cytoscape.md`](docs/adr/frontend_cytoscape.md)).
 
 #### Como a publicação está configurada
 
