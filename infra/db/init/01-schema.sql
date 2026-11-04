@@ -88,6 +88,17 @@ CREATE TABLE app.aresta (
     CHECK (deputado_a < deputado_b)
 );
 
+-- Posicao de cada vertice no desenho do grafo (layout ForceAtlas2 calculado
+-- pelo pipeline/layout.py, em pixels do Cytoscape). Chaveada pela execucao,
+-- como app.aresta, para posicao e arestas nunca virem de cargas diferentes.
+CREATE TABLE app.posicao (
+    execucao_id INTEGER REFERENCES app.execucao (execucao_id) ON DELETE CASCADE,
+    deputado_id INTEGER REFERENCES app.deputado (deputado_id),
+    x           DOUBLE PRECISION NOT NULL,
+    y           DOUBLE PRECISION NOT NULL,
+    PRIMARY KEY (execucao_id, deputado_id)
+);
+
 -- ---------------------------------------------------------------------------
 -- Indices (as chaves primarias ja cobrem as buscas pelo primeiro campo)
 -- ---------------------------------------------------------------------------

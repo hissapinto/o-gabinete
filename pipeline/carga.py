@@ -11,7 +11,8 @@ Sintese:
     Ultima etapa do pipeline. Grava no PostgreSQL tudo que a versao web le:
     os dados da Camara (deputados, proposicoes, votacoes, os vinculos entre
     votacao e proposicao, e os votos individuais) e os resultados do calculo
-    (execucao, concordancia entre pares e arestas do grafo).
+    (execucao, concordancia entre pares, arestas do grafo e a posicao x/y de
+    cada vertice no desenho, calculada pelo layout.py).
 
     Reaproveita as funcoes de similaridade.py e gerar_grafo.py em vez de
     recalcular, de modo que as arestas gravadas no banco sejam exatamente as
@@ -23,11 +24,21 @@ Sintese:
     cada carga registra uma execucao nova em app.execucao com os parametros
     usados, o que permite comparar versoes diferentes do grafo.
 
+    Idempotente: se a execucao mais recente do ano ja tem o layout gravado,
+    a carga termina sem baixar nada. FORCAR_CARGA=1 recarrega mesmo assim.
+    Le o banco de DATABASE_URL quando ela existe (servico carga do compose,
+    ou o Neon com sslmode=require); senao, das variaveis POSTGRES_* do .env.
+
 Historico de alteracoes:
     07/10/2026 - Kaique - Criacao.
+    04/11/2026 - Caio - Grava em app.posicao o layout de cada vertice, na
+                        mesma execucao das arestas.
+    04/11/2026 - Caio - Conexao por DATABASE_URL, carga pulada quando o ano
+                        ja esta carregado (FORCAR_CARGA) e erro claro no log.
 """
 
 import os
+import sys
 
 import pandas as pd
 import psycopg
@@ -37,6 +48,7 @@ from coleta import ANO_REFERENCIA, baixar_dados_brutos
 from processamento import ler_csv_camara, votacoes_de_merito
 from similaridade import MINIMO_VOTACOES_EM_COMUM, matriz_de_votos, concordancia, pares_com_concordancia
 from gerar_grafo import K_VIZINHOS, CONCORDANCIA_MINIMA, descartar_sem_par, montar_rotulos, montar_grafo
+from layout import calcular_layout
 
 
 def ler_configuracao():
@@ -54,6 +66,14 @@ def ler_configuracao():
 
 
 def conectar():
+    """
+    DATABASE_URL tem prioridade: e o que o compose passa e o que se usa contra
+    o Neon (a URL ja traz o sslmode=require). Sem ela, monta a conexao com as
+    POSTGRES_* do .env, para a execucao manual contra o banco local.
+    """
+    url = os.environ.get('DATABASE_URL')
+    if url:
+        return psycopg.connect(url)
     config = ler_configuracao()
     return psycopg.connect(
         host=config.get('POSTGRES_HOST', 'localhost'),
@@ -62,6 +82,38 @@ def conectar():
         user=config['POSTGRES_USER'],
         password=config.get('POSTGRES_PASSWORD', ''),
     )
+
+
+def forcar_carga():
+    """FORCAR_CARGA=1 (ou true/sim) recarrega mesmo com o ano ja carregado."""
+    return os.environ.get('FORCAR_CARGA', '').strip().lower() in ('1', 'true', 'sim', 'yes')
+
+
+def carga_existente(conexao, ano):
+    """
+    (execucao_id, posicoes) da execucao mais recente do ano, se ela ja tem o
+    layout gravado; senao None. Como a carga roda numa transacao so, execucao
+    gravada e execucao completa. O layout entra na conta porque uma execucao
+    anterior a app.posicao deixaria a rota do grafo sem posicoes.
+    """
+    with conexao.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT e.execucao_id, count(p.deputado_id) AS posicoes
+            FROM app.execucao e
+            LEFT JOIN app.posicao p USING (execucao_id)
+            WHERE e.execucao_id = (
+                SELECT max(execucao_id) FROM app.execucao
+                WHERE ano_inicio = %(ano)s AND ano_fim = %(ano)s
+            )
+            GROUP BY e.execucao_id
+            """,
+            {'ano': ano},
+        )
+        linha = cursor.fetchone()
+    if linha is None or linha[1] == 0:
+        return None
+    return linha
 
 
 def sem_nulos(df):
@@ -103,9 +155,11 @@ def votos_das_votacoes(df_votos, ids):
 
 def calcular_resultados(df_votos, ids, deputados):
     """
-    Concordancia de todos os pares validos e arestas do grafo, pelas regras do
-    similaridade.py e do gerar_grafo.py. As arestas passam pelo montar_grafo,
-    na mesma ordem de vertices do grafo.txt, para o banco ter as mesmas arestas.
+    Concordancia de todos os pares validos, arestas do grafo e posicao de cada
+    vertice, pelas regras do similaridade.py, do gerar_grafo.py e do layout.py.
+    As arestas passam pelo montar_grafo, na mesma ordem de vertices do
+    grafo.txt, para o banco ter as mesmas arestas; o layout recebe essa mesma
+    ordem e o peso inteiro, entao sai o mesmo desenho do prototipo de IHC.
     Os pares vem sempre com o menor deputado_id em deputado_a.
     """
     matriz = matriz_de_votos(df_votos[df_votos['idVotacao'].isin(ids)])
@@ -124,7 +178,15 @@ def calcular_resultados(df_votos, ids, deputados):
         linhas.append((deputado_a, deputado_b, peso))
     arestas = pd.DataFrame(linhas, columns=['deputado_a', 'deputado_b', 'peso'])
 
-    return pares, arestas
+    partidos = deputados.set_index('deputado_id')['deputado_siglaPartido'].to_dict()
+    layout = calcular_layout(
+        ids_grafo, partidos,
+        {(a, b): peso for a, b, peso in linhas})
+    posicoes = pd.DataFrame(
+        [(deputado_id, x, y) for deputado_id, (x, y) in layout.items()],
+        columns=['deputado_id', 'x', 'y'])
+
+    return pares, arestas, posicoes
 
 
 def carregar_deputados(conexao, df):
@@ -208,10 +270,12 @@ def atualizar_partido_atual(conexao):
         return cursor.rowcount
 
 
-def carregar_resultados(conexao, pares, arestas):
+def carregar_resultados(conexao, pares, arestas, posicoes):
     """
     Cria uma execucao nova do ano, com os parametros usados, e grava a
-    concordancia dos pares e as arestas dela. As execucoes antigas ficam
+    concordancia dos pares, as arestas e a posicao de cada vertice dela. A
+    posicao fica na mesma execucao das arestas, para as duas nunca virem de
+    cargas diferentes. As execucoes antigas ficam
     guardadas: rodar a carga de novo cria outra, sem apagar nada.
     """
     with conexao.cursor() as cursor:
@@ -231,10 +295,23 @@ def carregar_resultados(conexao, pares, arestas):
                        'execucao_id) FROM STDIN', pares.assign(execucao_id=execucao_id))
         copiar(cursor, 'COPY app.aresta (deputado_a, deputado_b, peso, execucao_id) FROM STDIN',
                arestas.assign(execucao_id=execucao_id))
+        copiar(cursor, 'COPY app.posicao (deputado_id, x, y, execucao_id) FROM STDIN',
+               posicoes.assign(execucao_id=execucao_id))
     return execucao_id
 
 
-if __name__ == "__main__":
+def main():
+    if forcar_carga():
+        print(f'FORCAR_CARGA ligado: {ANO_REFERENCIA} sera recarregado.')
+    else:
+        with conectar() as conexao:
+            existente = carga_existente(conexao, ANO_REFERENCIA)
+        if existente:
+            execucao_id, posicoes = existente
+            print(f'{ANO_REFERENCIA} ja carregado (execucao {execucao_id}, {posicoes} posicoes). '
+                  'Pulando; use FORCAR_CARGA=1 para recarregar.')
+            return
+
     pasta_brutos = baixar_dados_brutos()
     df_votos = ler_csv_camara(pasta_brutos / f'votacoesVotos-{ANO_REFERENCIA}.csv')
     ids = votacoes_de_merito(pasta_brutos)
@@ -243,7 +320,7 @@ if __name__ == "__main__":
     votacoes = votacoes_do_ano(pasta_brutos, ids)
     proposicoes, vinculos = proposicoes_das_votacoes(pasta_brutos, ids)
     votos = votos_das_votacoes(df_votos, ids)
-    pares, arestas = calcular_resultados(df_votos, ids, deputados)
+    pares, arestas, posicoes = calcular_resultados(df_votos, ids, deputados)
 
     # Uma transacao so: se qualquer etapa falhar, o banco fica como estava.
     # A ordem respeita as chaves estrangeiras.
@@ -252,9 +329,25 @@ if __name__ == "__main__":
         total_proposicoes = carregar_proposicoes(conexao, proposicoes)
         total_votacoes, total_votos = carregar_votacoes(conexao, votacoes, vinculos, votos)
         partidos_corrigidos = atualizar_partido_atual(conexao)
-        execucao_id = carregar_resultados(conexao, pares, arestas)
+        execucao_id = carregar_resultados(conexao, pares, arestas, posicoes)
 
     print(f'{ANO_REFERENCIA}: {total_deputados} deputados, {total_proposicoes} proposicoes, '
           f'{total_votacoes} votacoes de merito e {total_votos} votos gravados no banco.')
     print(f'{partidos_corrigidos} deputados com o partido atual recalculado pelos votos.')
-    print(f'Execucao {execucao_id}: {len(pares)} pares com concordancia e {len(arestas)} arestas gravados.')
+    print(f'Execucao {execucao_id}: {len(pares)} pares com concordancia, {len(arestas)} arestas '
+          f'e {len(posicoes)} posicoes gravados.')
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except Exception as erro:  # qualquer falha vira uma linha clara no log e saida 1
+        print(f'ERRO na carga de {ANO_REFERENCIA}: {type(erro).__name__}: {erro}', file=sys.stderr)
+        print('Nada foi gravado no banco (a carga roda numa transacao so).', file=sys.stderr)
+        if isinstance(erro, psycopg.errors.UndefinedTable):
+            print('Falta tabela no banco: aplique o infra/db/init/01-schema.sql '
+                  '(ou o CREATE TABLE app.posicao do README).', file=sys.stderr)
+        elif isinstance(erro, psycopg.OperationalError):
+            print('Sem conexao com o banco: confira a DATABASE_URL (ou as POSTGRES_* do .env).',
+                  file=sys.stderr)
+        sys.exit(1)

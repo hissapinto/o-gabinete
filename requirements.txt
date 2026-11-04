@@ -1,6 +1,10 @@
+# Dependencias do pipeline (pipeline/*.py), instaladas tambem pelo
+# pipeline/Dockerfile do servico carga. O notebook tem as suas em
+# requirements-notebook.txt.
 numpy==2.5.2
+# so o layout do grafo no pipeline/layout.py; o nucleo em grafos/ nao usa (RNF03)
+networkx==3.7
 pandas==3.0.5
 requests==2.34.2
-jupyter==1.1.1
 # Mantenha esta versao igual a do web/api/requirements.txt.
 psycopg[binary]==3.2.13
