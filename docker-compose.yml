@@ -15,26 +15,48 @@ services:
       timeout: 3s
       retries: 10
 
+  # Uso unico: roda o pipeline/carga.py e termina. Se o ano ja esta
+  # carregado, sai na hora sem baixar nada; FORCAR_CARGA=1 recarrega.
+  # Os CSVs ficam em dados/brutos/ da maquina, entao nao sao baixados de novo.
+  carga:
+    build:
+      context: .
+      dockerfile: pipeline/Dockerfile
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@database:5432/${POSTGRES_DB}
+      FORCAR_CARGA: ${FORCAR_CARGA:-0}
+    volumes:
+      - ./dados/brutos:/app/dados/brutos
+    restart: "no"
+    depends_on:
+      database:
+        condition: service_healthy
+
   backend:
     build: ./web/api
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@database:5432/${POSTGRES_DB}
+      # vazio: no compose o front chega pela mesma origem (proxy /api/ do nginx)
+      CORS_ORIGINS: ${CORS_ORIGINS:-}
+    # --reload so no desenvolvimento; o Dockerfile (Render) roda sem ele
+    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
     ports:
       - "8000:8000"
     volumes:
       - ./web/api:/app
     depends_on:
-      database:
-        condition: service_healthy
+      carga:
+        condition: service_completed_successfully
 
   frontend:
     build: ./web/frontend
-    environment:
-      API_URL: http://backend:8000
     ports:
-      - "8501:8501"
+      - "8501:80"
+    # So os arquivos da pagina: Dockerfile e nginx.conf nao viram estaticos.
     volumes:
-      - ./web/frontend:/app
+      - ./web/frontend/index.html:/usr/share/nginx/html/index.html:ro
+      - ./web/frontend/css:/usr/share/nginx/html/css:ro
+      - ./web/frontend/js:/usr/share/nginx/html/js:ro
     depends_on:
       - backend
 
