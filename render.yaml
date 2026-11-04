@@ -1,0 +1,45 @@
+# O Gabinete - Blueprint do Render (Dashboard -> New -> Blueprint).
+#
+# Dois servicos gratuitos: a API (Docker) e a interface (static site). O
+# banco NAO esta aqui: fica no Neon, porque o Postgres gratuito do Render
+# expira em 30 dias. Schema e carga rodam uma vez, da maquina de quem faz o
+# deploy (passo a passo em docs/DEPLOY.md).
+
+services:
+  - type: web
+    name: o-gabinete-api
+    runtime: docker
+    plan: free
+    # perto do Neon em AWS US East (N. Virginia); veja docs/DEPLOY.md
+    region: virginia
+    dockerfilePath: ./web/api/Dockerfile
+    dockerContext: ./web/api
+    healthCheckPath: /health
+    buildFilter:
+      paths:
+        - web/api/**
+    envVars:
+      # string POOLED do Neon (host com -pooler), com sslmode=require
+      - key: DATABASE_URL
+        sync: false
+      # vazio com o rewrite abaixo (mesma origem); so preencha se a
+      # interface chamar a API pela URL completa
+      - key: CORS_ORIGINS
+        sync: false
+
+  - type: web
+    name: o-gabinete
+    runtime: static
+    # Sem build de verdade: so separa os arquivos da pagina, para Dockerfile
+    # e nginx.conf nao virarem arquivos publicos.
+    buildCommand: mkdir -p dist && cp -r web/frontend/index.html web/frontend/css web/frontend/js dist/
+    staticPublishPath: ./dist
+    buildFilter:
+      paths:
+        - web/frontend/**
+    routes:
+      # Mesmo papel do proxy /api/ do nginx no compose: /api/anos -> API /anos.
+      # Se o Render der outro endereco a API (nome ocupado), ajuste aqui.
+      - type: rewrite
+        source: /api/*
+        destination: https://o-gabinete-api.onrender.com/*
