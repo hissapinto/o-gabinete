@@ -13,6 +13,8 @@
 
 > No plano gratuito a aplicação hiberna após 15 minutos sem acesso, e a primeira visita leva cerca de um minuto para carregar. Ela avisa na tela enquanto o servidor acorda.
 
+Por que Render e Neon, e como as peças se ligam: [6.8 Deploy na nuvem: decisões e motivos](#68-deploy-na-nuvem-decisões-e-motivos).
+
 [![Testes da API](https://github.com/hissapinto/o-gabinete/actions/workflows/testes-api.yml/badge.svg)](https://github.com/hissapinto/o-gabinete/actions/workflows/testes-api.yml)
 [![Testes do terminal e do pipeline](https://github.com/hissapinto/o-gabinete/actions/workflows/testes-terminal.yml/badge.svg)](https://github.com/hissapinto/o-gabinete/actions/workflows/testes-terminal.yml)
 
@@ -48,6 +50,7 @@
 4. [Wireframes](#capítulo-4--wireframes)
 5. [Modelagem Leve do Sistema (Casos de Uso)](#capítulo-5--modelagem-leve-do-sistema-casos-de-uso)
 6. [Arquitetura do Sistema](#capítulo-6--arquitetura-do-sistema)
+   - 6.8 [Deploy na nuvem: decisões e motivos](#68-deploy-na-nuvem-decisões-e-motivos)
 
 > **Nota de escopo:** o projeto foi originalmente proposto na disciplina de Teoria dos Grafos ("Mapa de Similaridade Política") e é aqui detalhado como produto de software do Laboratório de Engenharia de Software. A fonte de dados foi restringida **exclusivamente à Câmara dos Deputados** (não ao Senado Federal), consumindo o [Portal de Dados Abertos da Câmara](https://dadosabertos.camara.leg.br/swagger/api.html). Este documento é incremental e será expandido nas próximas entregas (TG2, TG3...).
 
@@ -804,3 +807,40 @@ O script tenta primeiro a API local, com os containers no ar, e salva as respost
 Detalhes do contrato dos JSONs e das decisões visuais estão em [`web/prototipo/README.md`](web/prototipo/README.md).
 
 A decisão de publicar um espelho estático do contrato da API, em vez de hospedar a aplicação inteira, está registrada no [ADR-0004](docs/adr/prototipo_estatico.md).
+
+### 6.8 Deploy na nuvem: decisões e motivos
+
+A aplicação está no ar em <https://o-gabinete.onrender.com>. A interface e a API rodam no **Render** e o banco PostgreSQL no **Neon**, todos no plano gratuito. O passo a passo está em [`docs/DEPLOY.md`](docs/DEPLOY.md) e o registro completo da decisão no [ADR de carga e deploy](docs/adr/carga_e_deploy.md).
+
+#### Como uma requisição chega ao banco
+
+```
+Navegador ──► Render: site estático "o-gabinete"
+                 │  serve o frontend e reescreve /api/* para a API
+                 ▼
+              Render: web service "o-gabinete-api" (FastAPI em Docker)
+                 │  DATABASE_URL = string "pooled" do Neon
+                 ▼
+              Neon: PostgreSQL 16 (us-east-1)
+                 ▲
+                 │  string "direta" do Neon
+              Máquina local: pipeline/carga.py (roda uma vez)
+```
+
+#### Decisões
+
+| Decisão | Motivo |
+|---|---|
+| **Render** para a interface e a API | Indicado pelo professor, gratuito e com deploy automático a cada push na `main`. Roda containers e sites estáticos sem configurar servidor. |
+| **Neon** para o banco, e não o Postgres do Render | O Postgres gratuito do Render expira em 30 dias. O Neon não expira, e o banco carregado (cerca de 30 MB) cabe com folga no limite gratuito de 1 GB. |
+| **Carga feita da máquina local**, direto no Neon | O plano gratuito do Render não tem job avulso, cron nem shell no container. A carga roda uma vez por ano de dados, então não compensa um serviço só para ela. Isso também respeita o ADR-0001: o pipeline é um subsistema offline e não roda dentro da API. |
+| **Site estático com reescrita `/api/*`** para a API | Página e API ficam no mesmo domínio, então não há CORS para configurar (`CORS_ORIGINS` fica vazio) e o frontend não tem o endereço da API fixo no código. É o mesmo papel que o nginx faz no `docker-compose.yml` local. |
+| **String "pooled" na API, "direta" na carga** | A API abre muitas conexões curtas, que o pooler do Neon reaproveita. O schema e a carga rodam numa transação longa, que precisa de uma conexão comum. |
+| **Região us-east-1 (Virgínia)** nos dois serviços | API e banco na mesma região, com menor latência em cada consulta. |
+| **`render.yaml` (Blueprint)** | A infraestrutura fica descrita em código e versionada no repositório, em vez de configurada à mão no painel. |
+| **Strings de conexão só em `.env.neon`** | Elas contêm a senha do banco. O arquivo está no `.gitignore` (`.env.*`), e no Render a `DATABASE_URL` é cadastrada no painel, nunca no código. |
+
+#### Limitações conhecidas
+
+- **A API hiberna** depois de 15 minutos sem acesso e leva cerca de 1 minuto para acordar. A interface avisa na tela e tenta de novo enquanto o servidor acorda.
+- **Mudanças no schema não são automáticas**: o `infra/db/init/01-schema.sql` só roda sozinho no container local. No Neon, uma alteração de schema precisa ser aplicada à mão.
