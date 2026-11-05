@@ -20,18 +20,28 @@ Historico de alteracoes:
     14/09/2026 - Kaique - Download dos CSVs de votos e votacoes de 2024.
     14/09/2026 - Kaique - Inclusao do download do arquivo de objetos das votacoes.
     25/09/2026 - Kaique - Inclusao do download do arquivo de proposicoes afetadas.
+    04/11/2026 - Isabela - Tentativas passam a tratar OSError, e nao so
+                           requests.RequestException: um TimeoutError cru
+                           escapava do laco e derrubava a carga.
+    04/11/2026 - Isabela - ANO_REFERENCIA passou a vir do ambiente, para o
+                           pipeline carregar outros anos da legislatura.
     19/10/2026 - Isabela - Download retomavel, com verificacao de tamanho e
                            gravacao em arquivo .part, para suportar a queda de
                            conexao do servidor da Camara.
 """
 
+import os
 import time
 
 import requests
 
 from utils import RAIZ
 
-ANO_REFERENCIA = 2024
+# Ano das votacoes. Vem do ambiente para carregar outros anos sem alterar
+# codigo: ANO_REFERENCIA=2023 python carga.py. Os quatro arquivos da Camara,
+# os nomes dos CSVs intermediarios e a execucao gravada no banco seguem
+# daqui, entao esta e a unica coisa a mudar para rodar outro ano.
+ANO_REFERENCIA = int(os.environ.get('ANO_REFERENCIA', 2024))
 
 URL_VOTOS = f'https://dadosabertos.camara.leg.br/arquivos/votacoesVotos/csv/votacoesVotos-{ANO_REFERENCIA}.csv'
 URL_VOTACOES = f'https://dadosabertos.camara.leg.br/arquivos/votacoes/csv/votacoes-{ANO_REFERENCIA}.csv'
@@ -52,7 +62,9 @@ def tamanho_no_servidor(url):
         if not resposta.ok:
             return None
         return int(resposta.headers['Content-Length'])
-    except (requests.RequestException, KeyError, ValueError):
+    # OSError, e nao requests.RequestException: RequestException herda de
+    # OSError, mas um TimeoutError cru nao e RequestException e escaparia.
+    except (OSError, KeyError, ValueError):
         return None
 
 
@@ -125,7 +137,7 @@ def baixar(url, caminho):
 
         try:
             continuar_download(url, parcial, obtido)
-        except requests.RequestException as erro:
+        except OSError as erro:
             print(f'  tentativa {tentativa}: {type(erro).__name__} em '
                   f'{tamanho_em_disco(parcial)} de {esperado} bytes.')
             time.sleep(ESPERA)

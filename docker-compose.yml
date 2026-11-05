@@ -1,3 +1,30 @@
+# O Gabinete - Mapa de Similaridade Politica entre Deputados Federais
+# Arquivo: docker-compose.yml
+#
+# Integrantes:
+#     Caio Ariel Cardoso Saraiva  - RA 10439611
+#     Isabela Hissa Pinto         - RA 10441873
+#     Kaique Barros Paiva         - RA 10441787
+#
+# Sintese:
+#     Orquestra a versao web em desenvolvimento: o banco PostgreSQL, um
+#     servico de carga que roda uma vez e termina, a API em FastAPI e a
+#     interface servida por nginx, que repassa /api/ para a API.
+#
+#     A ordem entre eles e garantida por depends_on com condicao: a carga so
+#     comeca com o banco saudavel, e a API so sobe com a carga concluida.
+#     Assim um "docker compose up" em maquina limpa entrega o grafo pronto.
+#
+#     Em producao esta composicao nao e usada: a API e a interface ficam no
+#     Render e o banco no Neon, conforme docs/DEPLOY.md e render.yaml.
+#
+# Historico de alteracoes:
+#     25/09/2026 - Caio - Criacao do ambiente conteinerizado (TG2).
+#     10/10/2026 - Caio - Caminhos ajustados apos a reorganizacao por componente.
+#     04/11/2026 - Caio - Servico de carga antes da API e interface em nginx.
+#     04/11/2026 - Isabela - ANO_REFERENCIA repassado ao servico de carga, para
+#                            carregar outros anos da legislatura.
+
 name: o-gabinete
 
 services:
@@ -25,6 +52,7 @@ services:
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@database:5432/${POSTGRES_DB}
       FORCAR_CARGA: ${FORCAR_CARGA:-0}
+      ANO_REFERENCIA: ${ANO_REFERENCIA:-2024}
     volumes:
       - ./dados/brutos:/app/dados/brutos
     restart: "no"
