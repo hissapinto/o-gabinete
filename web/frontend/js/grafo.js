@@ -18,12 +18,18 @@
  *                         contorno mais fino e "Enquadrar grafo" no zoom.
  *     29/10/2026 - Caio - Modo deputado com contorno de 2px, numero em selo
  *                         e zoom limitado; troca de tema sem recarregar.
+ *     05/11/2026 - Isabela - Faixa de similaridade fixa em 75-100% em todos
+ *                            os anos, no lugar do minimo/maximo de cada ano.
  */
 
 import { corDoPartido, lerCores } from './partidos.js';
 
 const LARGURA_MIN = 0.6;
 const LARGURA_MAX = 4.5;
+// Faixa fixa de similaridade, igual em todos os anos: 75% e o criterio do
+// pipeline (CONCORDANCIA_MINIMA) para existir aresta, e 100% e o teto.
+const SIMILARIDADE_MIN = 75;
+const SIMILARIDADE_MAX = 100;
 // tamanho do texto dos rotulos na tela, em px, independente do zoom
 const FONTE_ROTULO = 13;
 const FONTE_SELO = 11;
@@ -232,12 +238,11 @@ function agendarAtualizacaoDosRotulos() {
   });
 }
 
-/** Troca o grafo inteiro. A espessura da aresta vai do menor ao maior percentual do ano. */
+/** Troca o grafo inteiro. A espessura da aresta segue a faixa fixa de 75% a 100%. */
 export function desenhar(grafo) {
-  const percentuais = grafo.arestas.map((a) => Number(a.percentual));
-  const menor = Math.min(...percentuais);
-  const maior = Math.max(...percentuais);
-  const faixa = maior - menor || 1;
+  const menor = SIMILARIDADE_MIN;
+  const maior = SIMILARIDADE_MAX;
+  const faixa = maior - menor;
 
   const nos = grafo.nos.map((no) => ({
     group: 'nodes',
