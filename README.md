@@ -7,7 +7,7 @@
 
 | Endereço | O que é |
 |---|---|
-| **<https://o-gabinete.onrender.com>** | a aplicação: grafo interativo dos 535 deputados em 2024 |
+| **<https://o-gabinete.onrender.com>** | a aplicação: grafo interativo dos 535 deputados em 2023-2026 |
 | <https://o-gabinete-api.onrender.com/docs> | a API, com documentação interativa das seis rotas |
 | <https://hissapinto.github.io/o-gabinete/web/prototipo/> | protótipo de alta fidelidade (Interação Humano-Computador) |
 

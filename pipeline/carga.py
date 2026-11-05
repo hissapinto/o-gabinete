@@ -33,6 +33,9 @@ Historico de alteracoes:
     07/10/2026 - Kaique - Criacao.
     04/11/2026 - Caio - Grava em app.posicao o layout de cada vertice, na
                         mesma execucao das arestas.
+    04/11/2026 - Isabela - Votos sem valor registrado sao descartados; o
+                           arquivo de 2026 trouxe 466 deles e a coluna e
+                           NOT NULL.
     04/11/2026 - Caio - Conexao por DATABASE_URL, carga pulada quando o ano
                         ja esta carregado (FORCAR_CARGA) e erro claro no log.
 """
@@ -148,8 +151,22 @@ def proposicoes_das_votacoes(pasta_brutos, ids):
 
 
 def votos_das_votacoes(df_votos, ids):
-    """Voto de cada deputado, com o partido que ele tinha no dia."""
+    """
+    Voto de cada deputado, com o partido que ele tinha no dia.
+
+    Linhas sem voto registrado sao descartadas. A coluna app.voto.voto e NOT
+    NULL, e um registro sem valor nao e um voto: nem a favor, nem contra, nem
+    abstencao. Descartar nao altera nenhum percentual, porque o
+    matriz_de_votos ja trata voto desconhecido como neutro -- o mesmo que nao
+    ter votado. O arquivo de 2026 trouxe 466 linhas assim, de 53 mil.
+    """
     df = df_votos[df_votos['idVotacao'].isin(ids)]
+
+    sem_voto = int(df['voto'].isna().sum())
+    if sem_voto:
+        print(f'{sem_voto} votos sem valor registrado descartados.')
+        df = df[df['voto'].notna()]
+
     return sem_nulos(df[['idVotacao', 'deputado_id', 'voto', 'deputado_siglaPartido']])
 
 
