@@ -149,6 +149,10 @@ activemq-data/
 
 # Environments
 .env
+# Variantes como .env.neon, que guardam as connection strings do Neon.
+# A regra .env sozinha nao as pega, e elas contem a senha do banco.
+.env.*
+!.env.example
 .envrc
 .venv
 env/
