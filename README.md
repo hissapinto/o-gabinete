@@ -3,10 +3,18 @@
 > **TG1 – Definição do Produto de Software**
 > Laboratório de Engenharia de Software — Universidade Presbiteriana Mackenzie
 
+## Acesse a aplicação: **<https://o-gabinete.onrender.com>**
+
+| Endereço | O que é |
+|---|---|
+| **<https://o-gabinete.onrender.com>** | a aplicação: grafo interativo dos 535 deputados em 2024 |
+| <https://o-gabinete-api.onrender.com/docs> | a API, com documentação interativa das seis rotas |
+| <https://hissapinto.github.io/o-gabinete/web/prototipo/> | protótipo de alta fidelidade (Interação Humano-Computador) |
+
+> No plano gratuito a aplicação hiberna após 15 minutos sem acesso, e a primeira visita leva cerca de um minuto para carregar. Ela avisa na tela enquanto o servidor acorda.
+
 [![Testes da API](https://github.com/hissapinto/o-gabinete/actions/workflows/testes-api.yml/badge.svg)](https://github.com/hissapinto/o-gabinete/actions/workflows/testes-api.yml)
 [![Testes do terminal e do pipeline](https://github.com/hissapinto/o-gabinete/actions/workflows/testes-terminal.yml/badge.svg)](https://github.com/hissapinto/o-gabinete/actions/workflows/testes-terminal.yml)
-
-**Protótipo no ar:** <https://hissapinto.github.io/o-gabinete/web/prototipo/>
 
 ---
 
@@ -435,7 +443,7 @@ O projeto tem duas aplicações independentes, com preparações diferentes:
 | Terminal (Teoria dos Grafos) | Python 3 | 1, e depois "Aplicação de terminal" |
 | Web (Lab. de Engenharia de Software) | Docker | 2, 3 e 5 (a carga do passo 4 é automática) |
 
-Para publicar na nuvem (Render + Neon), siga o [`docs/DEPLOY.md`](docs/DEPLOY.md).
+Para publicar na nuvem (Render + Neon), siga o [`docs/DEPLOY.md`](docs/DEPLOY.md). A instalação em produção está em <https://o-gabinete.onrender.com>, com a API em <https://o-gabinete-api.onrender.com> e o banco no Neon.
 
 No GitHub Codespaces nada precisa ser instalado: o `.devcontainer` já traz Python, Docker e o `.env` prontos.
 
