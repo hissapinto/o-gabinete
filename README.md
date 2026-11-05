@@ -1,13 +1,12 @@
 # O Gabinete — Mapa de Similaridade Política entre Deputados Federais
 
-> **TG1 – Definição do Produto de Software**
 > Laboratório de Engenharia de Software — Universidade Presbiteriana Mackenzie
 
 ## Acesse a aplicação: **<https://o-gabinete.onrender.com>**
 
 | Endereço | O que é |
 |---|---|
-| **<https://o-gabinete.onrender.com>** | a aplicação: grafo interativo dos 535 deputados em 2023-2026 |
+| **<https://o-gabinete.onrender.com>** | a aplicação: grafo interativo de similaridade entre os deputados federais, um por ano |
 | <https://o-gabinete-api.onrender.com/docs> | a API, com documentação interativa das seis rotas |
 | <https://hissapinto.github.io/o-gabinete/web/prototipo/> | protótipo de alta fidelidade (Interação Humano-Computador) |
 
@@ -26,11 +25,10 @@ Por que Render e Neon, e como as peças se ligam: [6.8 Deploy na nuvem: decisõe
 |---|---|
 | **Universidade** | Universidade Presbiteriana Mackenzie — Faculdade de Computação e Informática |
 | **Disciplinas** | Laboratório de Engenharia de Software (Turma 6º D) · Teoria dos Grafos (Turma 6º D) · Interação Humano-Computador (Turma 6º D) |
-| **Professores** | Gustavo Moreira Calixto (Lab. de Engenharia de Software) · Ivan Carlos Alcântara de Oliveira (Teoria dos Grafos) · Profa. Elisângela Botelho Gracias (Interção Humano Computador) |
+| **Professores** | Gustavo Moreira Calixto (Lab. de Engenharia de Software) · Ivan Carlos Alcântara de Oliveira (Teoria dos Grafos) · Profa. Elisângela Botelho Gracias (Interação Humano-Computador) |
 | **Projeto** | O Gabinete — Mapa de Similaridade Política entre Deputados Federais |
 | **Grupo** | Caio Ariel Cardoso Saraiva (RA 10439611) · Isabela Hissa Pinto (RA 10441873) · Kaique Barros Paiva (RA 10441787) · Mateus Kage Moya (RA 10332608) |
 | **Repositório** | [github.com/hissapinto/o-gabinete](https://github.com/hissapinto/o-gabinete) |
-| **Entrega** | TG1 |
 
 > **Composição por disciplina.** O enunciado de Teoria dos Grafos limita os grupos a três integrantes. Naquela disciplina o projeto é entregue por Caio Ariel Cardoso Saraiva, Isabela Hissa Pinto e Kaique Barros Paiva. No Laboratório de Engenharia de Software o grupo conta também com Mateus Kage Moya.
 
@@ -52,17 +50,15 @@ Por que Render e Neon, e como as peças se ligam: [6.8 Deploy na nuvem: decisõe
 6. [Arquitetura do Sistema](#capítulo-6--arquitetura-do-sistema)
    - 6.8 [Deploy na nuvem: decisões e motivos](#68-deploy-na-nuvem-decisões-e-motivos)
 
-> **Nota de escopo:** o projeto foi originalmente proposto na disciplina de Teoria dos Grafos ("Mapa de Similaridade Política") e é aqui detalhado como produto de software do Laboratório de Engenharia de Software. A fonte de dados foi restringida **exclusivamente à Câmara dos Deputados** (não ao Senado Federal), consumindo o [Portal de Dados Abertos da Câmara](https://dadosabertos.camara.leg.br/swagger/api.html). Este documento é incremental e será expandido nas próximas entregas (TG2, TG3...).
+> **Nota de escopo:** o projeto foi originalmente proposto na disciplina de Teoria dos Grafos ("Mapa de Similaridade Política") e é aqui detalhado como produto de software do Laboratório de Engenharia de Software. A fonte de dados foi restringida **exclusivamente à Câmara dos Deputados** (não ao Senado Federal), consumindo o [Portal de Dados Abertos da Câmara](https://dadosabertos.camara.leg.br/swagger/api.html).
 
 ---
 
 ## Capítulo 1 – Introdução
 
-O presente documento constitui a primeira entrega (TG1) do grupo na disciplina de Laboratório de Engenharia de Software, cujo objetivo é definir, de forma inicial, o produto de software a ser desenvolvido ao longo do semestre.
+Este documento descreve o produto de software desenvolvido pelo grupo ao longo do semestre na disciplina de Laboratório de Engenharia de Software.
 
 O produto, batizado de **"O Gabinete"**, é uma aplicação que constrói e visualiza um **grafo de similaridade entre deputados federais brasileiros**, a partir de dados públicos de votações nominais disponibilizados pela Câmara dos Deputados. A proposta nasceu na disciplina de Teoria dos Grafos e é aqui detalhada sob a ótica da Engenharia de Software: levantamento de requisitos, casos de uso, protótipo de interface (wireframe) e arquitetura da solução.
-
-Os capítulos seguintes serão incrementados a cada nova entrega do grupo, conforme o andamento do projeto.
 
 ---
 
@@ -76,7 +72,7 @@ A Câmara dos Deputados disponibiliza um grande volume de dados públicos sobre 
 
 Grafos são uma representação natural para esse problema: cada deputado pode ser modelado como um vértice, e o grau de similaridade de comportamento de voto entre dois deputados como uma aresta ponderada. O partido não entra no cálculo da similaridade — ele é representado visualmente pela cor do vértice, de modo que os deputados que votam fora da orientação da própria bancada apareçam deslocados no grafo, o que é justamente o padrão mais informativo.
 
-Visualizar esse grafo permite identificar de forma intuitiva agrupamentos (blocos de votação, alianças informais, votos cruzados) que seriam difíceis de perceber apenas analisando planilhas. Isso está alinhado ao **ODS 16 (Paz, Justiça e Instituições Eficazes)**, ao promover maior acesso à informação e transparência sobre a atuação política.
+Visualizar esse grafo permite identificar de forma intuitiva agrupamentos (blocos de votação, alianças informais, votos cruzados) que seriam difíceis de perceber apenas analisando planilhas. Isso está alinhado ao **ODS 16 (Paz, Justiça e Instituições Eficazes)**, ao promover maior acesso à informação e transparência sobre a atuação política, e ao **ODS 1 (Erradicação da Pobreza)**, já que as políticas públicas de combate à pobreza são moldadas por decisões parlamentares.
 
 ### 2.3 Descrição sucinta do produto de software
 
@@ -124,7 +120,7 @@ Utilizando a categorização **FURPS+** como referência:
 
 ## Capítulo 3 – Requisitos
 
-A tabela abaixo compõe o **backlog inicial do produto**, com os requisitos ordenados por prioridade. Os requisitos serão refinados e movidos entre sprints nas próximas entregas.
+A tabela abaixo compõe o **backlog do produto**, com os requisitos ordenados por prioridade.
 
 | ID | Descrição | Tipo | Prioridade |
 |---|---|---|---|
@@ -152,11 +148,12 @@ A tabela abaixo compõe o **backlog inicial do produto**, com os requisitos orde
 
 **Regras de negócio identificadas:**
 
-- **RN01** — A similaridade entre dois deputados é calculada com base na proporção de votos coincidentes em proposições votadas por ambos.
+- **RN01** — A similaridade entre dois deputados é a proporção de votos coincidentes nas votações em que ambos votaram. Obstrução conta como voto contra; Abstenção e Artigo 17 ficam fora da conta.
 - **RN02** — Deputados com histórico de votação abaixo de um mínimo definido (30 votações em comum com ao menos um colega, constante `MINIMO_VOTACOES_EM_COMUM`) não entram no cálculo de similaridade, para evitar distorções estatísticas.
 - **RN03** — O peso de cada aresta do grafo representa o percentual de concordância de voto entre os dois deputados, expresso como inteiro de 0 a 100.
 - **RN04** — A filiação partidária não influencia o peso da aresta. O partido é representado apenas como atributo visual do vértice, para que divergências em relação à própria bancada permaneçam visíveis.
 - **RN05** — Somente votações nominais entram no cálculo, uma vez que votações simbólicas não registram o voto individual de cada parlamentar.
+- **RN06** — Cada deputado é ligado aos 5 colegas de maior concordância (constante `K_VIZINHOS`), desde que ela seja de pelo menos 75% (constante `CONCORDANCIA_MINIMA`). Um limiar fixo sozinho deixaria deputados isolados ou arestas demais.
 
 ---
 
@@ -217,15 +214,15 @@ Exibe os dois perfis lado a lado, o percentual de similaridade calculado e a lis
 **Cenário de sucesso principal:**
 
 1. O usuário acessa a aplicação "O Gabinete".
-2. O sistema carrega o grafo a partir do arquivo `dados/grafo.txt`.
+2. O sistema carrega o grafo do ano pela API (versão web), que lê a execução mais recente gravada no banco; na aplicação de terminal, a partir do arquivo `dados/grafo.txt`.
 3. O sistema renderiza os deputados como vértices e as similaridades como arestas ponderadas (espessura proporcional ao grau de similaridade, cor do vértice indicando o partido).
 4. O sistema exibe, junto ao grafo, um painel de legenda e estatísticas gerais (total de deputados carregados, fonte dos dados, período considerado).
 5. O usuário navega livremente pelo grafo (zoom, arraste, destaque de vértices ao passar o mouse).
 
 **Extensões (cenários alternativos):**
 
-- **2a.** Se o arquivo do grafo não existir, o sistema informa que o pipeline de ingestão ainda não foi executado e orienta o responsável pela base.
-- **3a.** Se o volume de arestas comprometer o desempenho da renderização, o sistema aplica um limiar mínimo de similaridade, reduzindo o número de arestas exibidas.
+- **2a.** Se o ano não tiver grafo carregado, o sistema informa que o pipeline de ingestão ainda não foi executado para aquele ano e orienta o responsável pela base.
+- **3a.** Para o volume de arestas não comprometer a renderização, o grafo traz só as ligações de cada deputado com os mais parecidos (RN06), e as posições dos vértices já vêm calculadas pelo pipeline.
 - **5a.** Se o usuário não interagir com o grafo, a tela permanece estática, exibindo o estado inicial completo.
 
 **Requisitos especiais:** RF04, RF05, RF07, RNF01, RNF05.
@@ -348,7 +345,7 @@ o-gabinete/
 ├── .devcontainer/
 │   └── devcontainer.json       ambiente do GitHub Codespaces
 ├── .github/
-│   └── workflows/              integração contínua (testes da API)
+│   └── workflows/              integração contínua (testes da API e do terminal/pipeline)
 ├── dados/
 │   ├── brutos/                 CSVs baixados, não versionado
 │   └── grafo.txt               grafo da aplicação de terminal
@@ -554,7 +551,7 @@ curl localhost:8000/health
 
 #### Passo 4 — Carga dos dados (automática)
 
-O serviço `carga` do compose roda o `pipeline/carga.py` a cada `docker compose up`. O script baixa os CSVs do ano de referência, filtra as votações de mérito, calcula a concordância entre os deputados e a posição de cada um no desenho do grafo (cerca de 20 segundos) e grava tudo no banco em uma única transação.
+O serviço `carga` do compose roda o `pipeline/carga.py` a cada `docker compose up`. O script baixa os CSVs do ano de referência (variável `ANO_REFERENCIA` do `.env`, padrão 2024), filtra as votações de mérito, calcula a concordância entre os deputados e a posição de cada um no desenho do grafo (cerca de 20 segundos) e grava tudo no banco em uma única transação.
 
 - **Não repete trabalho.** Se a execução mais recente do ano já tem o layout gravado, a carga imprime `2024 ja carregado (...). Pulando` e termina na hora, sem baixar nada. Os CSVs ficam em `dados/brutos/` (volume), e um arquivo que já existe completo não é baixado de novo.
 - **Recarregar de propósito:** `FORCAR_CARGA=1 docker compose up carga`. Cada recarga registra uma execução nova em `app.execucao`; as votações do ano são substituídas, sem duplicar.
@@ -620,7 +617,7 @@ O projeto tem três suítes, com papéis diferentes e que não se substituem:
 | Suíte | Onde | O que verifica | Precisa de quê |
 |---|---|---|---|
 | pytest da API | `web/api/tests/` | o SQL, as regras de decisão e a tradução para HTTP | PostgreSQL no ar |
-| pytest do terminal e do pipeline | `tests/` | estrutura do grafo, algoritmos, formato do `grafo.txt` e a RN01 do pipeline | nada |
+| pytest do terminal e do pipeline | `tests/` | estrutura do grafo, algoritmos, formato do `grafo.txt` e as etapas do pipeline (coleta, RN01, filtro de mérito, montagem do grafo e carga) | nada |
 | Postman | `web/api/postman/` | contrato e invariantes sobre o banco carregado pelo pipeline | API no ar com dados |
 
 As duas suítes em pytest rodam na integração contínua, em workflows separados. A coleção do Postman serve para inspeção manual e para conferir a API rodando com dados reais, em que os números mudam a cada carga.
@@ -719,7 +716,10 @@ tests/
 └── pipeline/
     ├── test_similaridade.py     a RN01 do lado do pipeline
     ├── test_processamento.py    o filtro de votações de mérito
-    └── test_gerar_grafo.py      ordenação, escolha de arestas e gravação
+    ├── test_gerar_grafo.py      ordenação, escolha de arestas e gravação
+    ├── test_coleta.py           download retomável e novas tentativas
+    ├── test_carga.py            leitura dos CSVs e descarte de votos sem valor
+    └── test_utils.py            localização da raiz do projeto
 ```
 
 Não precisa de Docker, de banco nem de rede. Com o venv ativo, a partir da raiz:
@@ -731,7 +731,7 @@ pytest
 
 O `pytest` sem argumentos usa o `pytest.ini` da raiz, que aponta para `tests/`. A suíte da API fica fora dessa execução de propósito: ela tem o próprio `pytest.ini` em `web/api/` porque precisa de banco. Para rodar as duas, são dois comandos.
 
-Rodar a partir da raiz é obrigatório: o `pipeline/utils.py` localiza a raiz do projeto subindo diretórios a partir do diretório atual, e não a partir do próprio arquivo.
+Rodar a partir da raiz é obrigatório: o `pipeline/utils.py` localiza a raiz do projeto subindo diretórios a partir do diretório atual, e não a partir do próprio arquivo. Fora do projeto, ele para com uma mensagem em vez de procurar indefinidamente.
 
 Dois testes merecem destaque. O `test_par_do_cenario_bate_com_o_da_api` usa exatamente os mesmos votos de `web/api/tests/cenario.py` e espera os mesmos números — é o único ponto do projeto que acusaria uma divergência entre as duas implementações da RN01. E o `test_arquivo_gravado_e_legivel_pela_aplicacao_de_terminal` grava um grafo com o `gerar_grafo.py` e o lê de volta com a `persistencia.py`, verificando o único ponto de contato entre o pipeline e a aplicação de terminal.
 
