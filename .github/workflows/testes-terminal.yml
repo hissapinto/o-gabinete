@@ -1,0 +1,51 @@
+# O Gabinete - Mapa de Similaridade Politica entre Deputados Federais
+# Arquivo: .github/workflows/testes-terminal.yml
+#
+# Integrantes:
+#     Caio Ariel Cardoso Saraiva  - RA 10439611
+#     Isabela Hissa Pinto         - RA 10441873
+#     Kaique Barros Paiva         - RA 10441787
+#
+# Sintese:
+#     Roda a suite da aplicacao de terminal e do pipeline a cada push e a cada
+#     pull request. Diferente da suite da API, esta nao precisa de banco nem
+#     de container: sao funcoes puras sobre estruturas montadas em memoria e
+#     arquivos em pasta temporaria.
+#
+#     A suite roda a partir da raiz do repositorio porque pipeline/utils.py
+#     localiza a raiz do projeto subindo diretorios a partir do diretorio
+#     atual, e nao a partir do proprio arquivo.
+#
+# Historico de alteracoes:
+#     04/11/2026 - Isabela - Criacao.
+
+name: Testes do terminal e do pipeline
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  testes:
+    name: pytest sobre grafos e pipeline
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Obter o codigo
+        uses: actions/checkout@v4
+
+      - name: Preparar o Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+
+      - name: Instalar as dependencias
+        run: pip install -r requirements-dev.txt
+
+      - name: Rodar a suite
+        run: pytest -v

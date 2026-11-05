@@ -4,6 +4,7 @@
 > Laboratório de Engenharia de Software — Universidade Presbiteriana Mackenzie
 
 [![Testes da API](https://github.com/hissapinto/o-gabinete/actions/workflows/testes-api.yml/badge.svg)](https://github.com/hissapinto/o-gabinete/actions/workflows/testes-api.yml)
+[![Testes do terminal e do pipeline](https://github.com/hissapinto/o-gabinete/actions/workflows/testes-terminal.yml/badge.svg)](https://github.com/hissapinto/o-gabinete/actions/workflows/testes-terminal.yml)
 
 **Protótipo no ar:** <https://hissapinto.github.io/o-gabinete/web/prototipo/>
 
@@ -361,6 +362,9 @@ o-gabinete/
 ├── infra/
 │   └── db/init/
 │       └── 01-schema.sql       esquema inicial do banco
+├── tests/                      suíte do terminal e do pipeline
+│   ├── grafos/                 estrutura, algoritmos e persistência
+│   └── pipeline/               RN01, filtro de mérito e montagem do grafo
 ├── pipeline/                   subsistema offline
 │   ├── utils.py
 │   ├── coleta.py
@@ -415,7 +419,7 @@ o-gabinete/
 | Banco de dados | PostgreSQL 16, acessado com `psycopg` | versão web |
 | Containers | Docker e Docker Compose | versão web |
 | Ambiente de desenvolvimento | GitHub Codespaces (`.devcontainer`) | todo o projeto |
-| Testes | pytest | `web/api/tests/` |
+| Testes | pytest | `web/api/tests/` (API) e `tests/` (terminal e pipeline) |
 | Integração contínua | GitHub Actions | `.github/workflows/` |
 | Publicação do protótipo | GitHub Pages | `web/prototipo/` |
 | Testes de contrato da API | coleção Postman, executável por Newman | `web/api/postman/` |
@@ -600,14 +604,15 @@ python grafos/main.py
 
 ### 6.6 Testes automatizados
 
-A API tem duas suítes, com papéis diferentes e que não se substituem:
+O projeto tem três suítes, com papéis diferentes e que não se substituem:
 
-| Suíte | Onde | O que verifica | Precisa da API no ar? |
+| Suíte | Onde | O que verifica | Precisa de quê |
 |---|---|---|---|
-| pytest | `web/api/tests/` | valores exatos sobre um banco que ela mesma monta | não |
-| Postman | `web/api/postman/` | contrato e invariantes sobre o banco carregado pelo pipeline | sim |
+| pytest da API | `web/api/tests/` | o SQL, as regras de decisão e a tradução para HTTP | PostgreSQL no ar |
+| pytest do terminal e do pipeline | `tests/` | estrutura do grafo, algoritmos, formato do `grafo.txt` e a RN01 do pipeline | nada |
+| Postman | `web/api/postman/` | contrato e invariantes sobre o banco carregado pelo pipeline | API no ar com dados |
 
-A suíte em pytest é a que roda na integração contínua. A coleção do Postman serve para inspeção manual e para conferir a API rodando com dados reais, em que os números mudam a cada carga.
+As duas suítes em pytest rodam na integração contínua, em workflows separados. A coleção do Postman serve para inspeção manual e para conferir a API rodando com dados reais, em que os números mudam a cada carga.
 
 A escolha de testar contra um PostgreSQL real, em vez de dublês, está registrada no [ADR-0003](docs/adr/testes_automatizados.md).
 
@@ -674,11 +679,50 @@ A suíte lê as mesmas variáveis do `.env`, e usa estes padrões quando elas n�
 
 #### Integração contínua
 
-O workflow `.github/workflows/testes-api.yml` roda a suíte a cada push em qualquer branch e a cada pull request para a `main`. O PostgreSQL sobe como serviço do próprio job, com `healthcheck` para os testes não começarem antes de o banco aceitar conexão, e a suíte cria o banco de teste dentro dele.
+São dois workflows, ambos disparados a cada push em qualquer branch e a cada pull request para a `main`:
 
-O job não depende de carga de dados nem da API no ar, então não acessa a internet nem o Portal da Câmara: roda em segundos e não falha por indisponibilidade de terceiros.
+| Workflow | Suíte | Duração típica |
+|---|---|---|
+| `.github/workflows/testes-api.yml` | `web/api/tests/` | segundos, com o PostgreSQL subindo como serviço do job |
+| `.github/workflows/testes-terminal.yml` | `tests/` | segundos, sem nenhuma infraestrutura |
 
-O resultado aparece no selo no topo deste README e em cada pull request.
+No primeiro, o PostgreSQL sobe como serviço do próprio job, com `healthcheck` para os testes não começarem antes de o banco aceitar conexão, e a suíte cria o banco de teste dentro dele. O segundo não precisa de serviço nenhum.
+
+Nenhum dos dois depende de carga de dados, da API no ar ou do Portal da Câmara: rodam em segundos e não falham por indisponibilidade de terceiros.
+
+O resultado aparece nos selos no topo deste README e em cada pull request.
+
+**Os checks reprovam, mas ainda não impedem o merge.** Um pull request com teste vermelho continua podendo ser mesclado, porque isso depende de uma regra de proteção de branch, que o repositório ainda não tem. Para tornar os testes obrigatórios: **Settings → Branches → Add branch ruleset**, com o alvo `main`, marcando *Require status checks to pass* e selecionando os checks `pytest sobre web/api` e `pytest sobre grafos e pipeline`.
+
+#### A suíte do terminal e do pipeline
+
+Fica em `tests/`, espelhando os dois subsistemas que não dependem de banco:
+
+```
+tests/
+├── grafos/
+│   ├── test_fila_circular.py    a fila da aula, com a volta dos índices
+│   ├── test_grafo.py            lista de adjacência, pesos e remoção de vértice
+│   ├── test_logica_grafos.py    componentes conexas, conexidade e isolados
+│   └── test_persistencia.py     ida e volta do formato do `grafo.txt`
+└── pipeline/
+    ├── test_similaridade.py     a RN01 do lado do pipeline
+    ├── test_processamento.py    o filtro de votações de mérito
+    └── test_gerar_grafo.py      ordenação, escolha de arestas e gravação
+```
+
+Não precisa de Docker, de banco nem de rede. Com o venv ativo, a partir da raiz:
+
+```
+pip install -r requirements-dev.txt
+pytest
+```
+
+O `pytest` sem argumentos usa o `pytest.ini` da raiz, que aponta para `tests/`. A suíte da API fica fora dessa execução de propósito: ela tem o próprio `pytest.ini` em `web/api/` porque precisa de banco. Para rodar as duas, são dois comandos.
+
+Rodar a partir da raiz é obrigatório: o `pipeline/utils.py` localiza a raiz do projeto subindo diretórios a partir do diretório atual, e não a partir do próprio arquivo.
+
+Dois testes merecem destaque. O `test_par_do_cenario_bate_com_o_da_api` usa exatamente os mesmos votos de `web/api/tests/cenario.py` e espera os mesmos números — é o único ponto do projeto que acusaria uma divergência entre as duas implementações da RN01. E o `test_arquivo_gravado_e_legivel_pela_aplicacao_de_terminal` grava um grafo com o `gerar_grafo.py` e o lê de volta com a `persistencia.py`, verificando o único ponto de contato entre o pipeline e a aplicação de terminal.
 
 #### A coleção do Postman
 

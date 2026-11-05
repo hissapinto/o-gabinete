@@ -1,0 +1,4 @@
+# Dependencias para rodar a suite da aplicacao de terminal e do pipeline.
+# A suite da API tem a propria lista em web/api/requirements-dev.txt.
+-r requirements.txt
+pytest==8.3.4

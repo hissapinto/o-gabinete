@@ -22,6 +22,8 @@ Historico de alteracoes:
     26/09/2026 - Kaique - Arquivo renomeado de GrafoPonderadoND.py para
                           grafo.py, nome usado nos imports.
     18/10/2026 - Isabela - Caminho do cabecalho atualizado apos a reorganizacao das pastas.
+    04/11/2026 - Isabela - Implementacao do _atualizaPeso, que insereA ja
+                           chamava mas nao existia na classe.
 """
 
 from grafoLista import Grafo as GrafoBase
@@ -104,6 +106,11 @@ class GrafoPonderadoND(GrafoBase):
         self.listaAdj[w].append((v, peso))
         self.m += 1
         return True
+
+    def _atualizaPeso(self, v, w, peso):
+        """Troca o peso da aresta {v, w} nos dois sentidos."""
+        self.listaAdj[v] = [(x, peso if x == w else p) for (x, p) in self.listaAdj[v]]
+        self.listaAdj[w] = [(x, peso if x == v else p) for (x, p) in self.listaAdj[w]]
 
     def removeA(self, v, w):
         """Remove a aresta {v, w} nos dois sentidos."""
