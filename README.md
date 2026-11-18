@@ -12,8 +12,6 @@
 
 > No plano gratuito a aplicação hiberna após 15 minutos sem acesso, e a primeira visita leva cerca de um minuto para carregar. Ela avisa na tela enquanto o servidor acorda.
 
-Por que Render e Neon, e como as peças se ligam: [6.8 Deploy na nuvem: decisões e motivos](#68-deploy-na-nuvem-decisões-e-motivos).
-
 [![Testes da API](https://github.com/hissapinto/o-gabinete/actions/workflows/testes-api.yml/badge.svg)](https://github.com/hissapinto/o-gabinete/actions/workflows/testes-api.yml)
 [![Testes do terminal e do pipeline](https://github.com/hissapinto/o-gabinete/actions/workflows/testes-terminal.yml/badge.svg)](https://github.com/hissapinto/o-gabinete/actions/workflows/testes-terminal.yml)
 
@@ -36,29 +34,211 @@ Por que Render e Neon, e como as peças se ligam: [6.8 Deploy na nuvem: decisõe
 
 ## Sumário
 
+**Parte I — Apresentação executiva (Entrega Final TG3)**
+
+1. [Retomada dos objetivos](#1-retomada-dos-objetivos)
+2. [Principais funcionalidades alcançadas](#2-principais-funcionalidades-alcançadas)
+3. [Desenho da arquitetura do sistema](#3-desenho-da-arquitetura-do-sistema)
+4. [Pontos de melhoria e evolução do projeto](#4-pontos-de-melhoria-e-evolução-do-projeto)
+4. [Potencial de continuidade (TCC, IC, Incubadora)](#5-potencial-de-continuidade-tcc-ic-incubadora)
+5. [Como executar a aplicação](#6-como-executar-a-aplicação)
+7. [Testes automatizados em GitHub Actions](#7-testes-automatizados-em-github-actions)
+8. [Como foi o processo de deploy](#8-como-foi-o-processo-de-deploy)
+9. [Dificuldades e experiências no deploy](#9-dificuldades-e-experiências-no-deploy)
+
+**Parte II — Documentação técnica**
+
 1. [Introdução](#capítulo-1--introdução)
 2. [Definição da Demanda](#capítulo-2--definição-da-demanda)
-   - 2.1 [O problema ou oportunidade percebida](#21-o-problema-ou-oportunidade-percebida)
-   - 2.2 [A razão ou justificativa para esta demanda](#22-a-razão-ou-justificativa-para-esta-demanda)
-   - 2.3 [Descrição sucinta do produto de software](#23-descrição-sucinta-do-produto-de-software)
-   - 2.4 [Clientes, usuários e demais envolvidos](#24-clientes-usuários-e-demais-envolvidosimpactados)
-   - 2.5 [Principais etapas para construir o produto](#25-principais-etapas-necessárias-para-construir-o-produto)
-   - 2.6 [Principais critérios de qualidade](#26-principais-critérios-de-qualidade-para-o-produto)
 3. [Requisitos](#capítulo-3--requisitos)
-4. [Wireframes](#capítulo-4--wireframes)
-5. [Modelagem Leve do Sistema (Casos de Uso)](#capítulo-5--modelagem-leve-do-sistema-casos-de-uso)
-6. [Arquitetura do Sistema](#capítulo-6--arquitetura-do-sistema)
-   - 6.8 [Deploy na nuvem: decisões e motivos](#68-deploy-na-nuvem-decisões-e-motivos)
+4. [Modelagem Leve do Sistema (Casos de Uso)](#capítulo-4--modelagem-leve-do-sistema-casos-de-uso)
+5. [Arquitetura do Sistema](#capítulo-5--arquitetura-do-sistema)
+   - 5.5 [Como executar (passo a passo completo)](#55-como-executar)
+   - 5.6 [Testes automatizados](#56-testes-automatizados)
+   - 5.7 [Protótipo publicado](#57-protótipo-publicado)
+   - 5.8 [Deploy na nuvem: decisões e motivos](#58-deploy-na-nuvem-decisões-e-motivos)
 
 > **Nota de escopo:** o projeto foi originalmente proposto na disciplina de Teoria dos Grafos ("Mapa de Similaridade Política") e é aqui detalhado como produto de software do Laboratório de Engenharia de Software. A fonte de dados foi restringida **exclusivamente à Câmara dos Deputados** (não ao Senado Federal), consumindo o [Portal de Dados Abertos da Câmara](https://dadosabertos.camara.leg.br/swagger/api.html).
 
 ---
 
+# Parte I — Apresentação executiva (Entrega Final TG3)
+
+## 1. Retomada dos objetivos
+
+A Câmara dos Deputados publica todas as votações nominais no Portal de Dados Abertos, mas em arquivos CSV separados por ano e endpoints distintos, pouco acessíveis a quem não tem formação técnica. O objetivo do projeto era **transformar esses dados num mapa visual de quem vota parecido com quem**, para que um cidadão, jornalista ou pesquisador perceba blocos de votação, alianças informais e deputados que votam fora da linha do próprio partido.
+
+Em termos concretos, o produto deveria:
+
+- **importar** os dados de deputados e votações nominais diretamente das fontes oficiais da Câmara;
+- **calcular** a concordância de voto entre cada par de deputados, sem usar o partido no cálculo (o partido aparece só como cor, para que as divergências fiquem visíveis);
+- **montar um grafo** ponderado, com estrutura de grafo própria (lista de adjacência), e oferecer operações sobre ele num programa de terminal (Teoria dos Grafos);
+- **publicar uma interface web** em que qualquer pessoa explore esse grafo pelo navegador, sem instalar nada (Laboratório de Engenharia de Software).
+
+O projeto se alinha ao **ODS 16** (instituições eficazes e acesso à informação). A definição completa da demanda está no [Capítulo 2](#capítulo-2--definição-da-demanda).
+
+## 2. Principais funcionalidades alcançadas
+
+**O que a aplicação entrega hoje:**
+
+- **Grafo interativo de 2024** com 535 deputados e 2.290 arestas. Cada deputado se liga aos 5 colegas com maior concordância, desde que seja de pelo menos 75% (RN06). As posições dos vértices são calculadas no pipeline (ForceAtlas2), e o navegador só desenha.
+- **Busca** por nome, partido ou UF, com sugestões e atalho de teclado (`/`).
+- **Ficha do deputado**: ao clicar num vértice, o painel mostra foto, partido, UF e a lista dos colegas mais parecidos, com o percentual de concordância de cada um.
+- **Destaque por partido**: a legenda lista os partidos, e escolher um deles realça a bancada no grafo.
+- **Seletor de ano**, já preparado para vários anos de dados.
+- **Tema claro e escuro.**
+- **Tolerância ao servidor dormindo**: enquanto a API acorda, a interface tenta de novo por até cerca de 90 segundos e avisa o usuário.
+- **API REST** com seis rotas, incluindo a comparação entre dois deputados com as votações em que concordaram e divergiram.
+- **Aplicação de terminal** com menu para ler, gravar, inserir e remover vértices e arestas, exibir o grafo e analisar a conexidade.
+- **Pipeline automatizado**: baixa os CSVs da Câmara, filtra as votações de mérito, calcula a concordância, gera o layout e carrega o banco numa transação única e idempotente.
+
+**Situação dos requisitos do backlog** ([Capítulo 3](#capítulo-3--requisitos)):
+
+| Requisito | Situação | Observação |
+|---|---|---|
+| RF01–RF05: importação, similaridade, grafo e persistência | ✅ Atendido | pipeline completo, com o grafo em arquivo e no banco |
+| RF06: aplicação de terminal | ✅ Atendido | menu com todas as operações e análise de conexidade |
+| RF07: visualização interativa | ✅ Atendido | Cytoscape.js, em produção no Render |
+| RF08: busca por nome, partido ou UF | ✅ Atendido | |
+| RF09: ficha do deputado | ✅ Atendido | foto, partido, UF e mais similares |
+| RF10: filtros por partido, UF e legislatura | 🟡 Parcial | destaque por partido e seletor de ano; UF só pela busca |
+| RF11: comparar dois deputados | 🟡 Parcial | a rota `/anos/{ano}/concordancias/{a}/{b}` está pronta e testada, mas falta a tela |
+| RF12: destacar agrupamentos | 🟡 Parcial | o layout por forças já aproxima quem vota parecido, mas não há detecção explícita de comunidades |
+| RF13: atualização periódica | 🟡 Parcial | a carga é idempotente e o ano é configurável, mas roda manualmente |
+| RNF01–RNF08 | ✅ Atendidos | inclusive RNF03 (grafo próprio, sem biblioteca no núcleo) e RNF07 (acesso pelo navegador) |
+
+## 3. Desenho da arquitetura do sistema
+
+A arquitetura é **em camadas**. Um **pipeline offline** alimenta duas aplicações: a de terminal, que lê o arquivo `dados/grafo.txt`, e a web, que lê o banco PostgreSQL. Em produção, a interface e a API rodam no Render e o banco no Neon.
+
+```mermaid
+flowchart LR
+    Camara[("Portal de Dados Abertos<br/>Câmara dos Deputados")]
+
+    subgraph Pipeline["Pipeline offline (Python)"]
+        P["coleta → processamento →<br/>similaridade → grafo → layout → carga"]
+    end
+
+    Arquivo[("dados/grafo.txt")]
+    Terminal["Aplicação de terminal<br/>apresentação · negócio · persistência"]
+
+    subgraph Producao["Produção"]
+        Front["Render: site estático<br/>HTML/JS + Cytoscape.js"]
+        API["Render: API<br/>FastAPI em Docker"]
+        DB[("Neon<br/>PostgreSQL 16")]
+    end
+
+    Usuario(["Usuário"])
+
+    Camara --> P
+    P --> Arquivo --> Terminal
+    P -->|"carga (string direta)"| DB
+    Usuario --> Front -->|"/api/* (rewrite)"| API -->|"SQL (string pooled)"| DB
+```
+
+Dentro da API, cada requisição atravessa `rotas/` (HTTP), depois `servicos/` (regras de negócio), depois `repositorios/` (SQL). Só o `banco.py` conhece a conexão com o banco. As principais decisões estão registradas como ADRs em [`docs/adr/`](docs/adr/). O diagrama completo, com cada módulo, e a descrição das camadas estão na [seção 5.1](#51-visão-geral) e na [seção 5.2](#52-descrição-das-camadas).
+
+## 4. Pontos de melhoria e evolução do projeto
+
+**Completar o backlog**
+
+- **Tela de comparação entre dois deputados (RF11).** A API já devolve as votações em que o par concordou e divergiu. Falta a tela na interface.
+- **Filtro por UF e por legislatura (RF10)** no painel, além do destaque por partido.
+- **Detecção de comunidades (RF12)**, por exemplo com o algoritmo de Louvain no pipeline, gravando o grupo de cada deputado para a interface colorir os blocos.
+
+**Dados**
+
+- **Carregar vários anos** (2019 a 2025, por exemplo) e mostrar como um deputado se aproxima ou se afasta do próprio partido ao longo do tempo. O seletor de ano e o modelo de dados já suportam isso.
+- **Atualização automática (RF13)**: um workflow agendado no GitHub Actions poderia rodar a carga contra o Neon, com a string de conexão guardada como *secret*. Isso contorna a falta de cron no plano gratuito do Render.
+- **Incluir o Senado Federal**, hoje fora do escopo.
+
+**Engenharia**
+
+- **Migrações de schema versionadas**: hoje, uma mudança no `01-schema.sql` precisa ser aplicada no Neon à mão.
+- **Proteção da branch `main`**, para os testes do CI bloquearem o merge, e não só avisarem.
+- **Testes do frontend**: a API e o pipeline têm suíte automatizada, mas a interface ainda não.
+- **Limpeza de execuções antigas** no banco, que hoje se acumulam a cada recarga forçada.
+- **Primeiro acesso mais rápido**: um plano pago, ou um ping periódico, para a API não hibernar.
+
+## 5. Potencial de continuidade (TCC, IC, Incubadora)
+
+- **Iniciação Científica.** O projeto já tem uma base de dados limpa e uma métrica de concordância documentada. Isso abre perguntas de pesquisa em ciência política computacional: a coesão das bancadas muda ao longo dos anos? Os agrupamentos detectados por algoritmos de comunidade coincidem com os partidos ou com as frentes parlamentares? Como métricas de centralidade identificam deputados "ponte" entre blocos?
+- **TCC.** Uma evolução natural é a **análise temporal** da rede: vários anos e legislaturas, detecção de comunidades e visualização da mudança de alianças. Também dá para estender o projeto ao Senado e às votações em comissões. O pipeline, a API e o deploy já prontos deixam o trabalho concentrado na parte nova.
+- **Incubadora.** O público natural é o de **jornalismo de dados e organizações de transparência**. Um produto possível teria alertas quando um deputado vota contra a própria bancada, páginas incorporáveis em matérias e uma API para redações. Por usar só dados públicos e infraestrutura gratuita, o custo para validar a ideia é baixo.
+
+## 6. Como executar a aplicação
+
+**Em produção**, basta abrir <https://o-gabinete.onrender.com>. A primeira visita pode levar cerca de um minuto, enquanto o servidor acorda.
+
+**Versão web, localmente** (precisa de Docker; no GitHub Codespaces já vem tudo pronto):
+
+```bash
+git clone https://github.com/hissapinto/o-gabinete.git
+cd o-gabinete
+cp .env.example .env
+docker compose up -d
+```
+
+O compose sobe o banco, roda a **carga** (que na primeira vez baixa cerca de 75 MB da Câmara e leva alguns minutos), depois a API e o frontend. Em seguida:
+
+| Endereço | O que é |
+|---|---|
+| `http://localhost:8501` | interface web |
+| `http://localhost:8000/docs` | documentação interativa da API |
+
+**Aplicação de terminal** (só precisa de Python 3, sem rede nem Docker):
+
+```bash
+python grafos/main.py
+```
+
+O passo a passo completo, com pré-requisitos por sistema operacional, venv, variáveis de ambiente e problemas comuns, está na [seção 5.5](#55-como-executar). O guia de publicação na nuvem está em [`docs/DEPLOY.md`](docs/DEPLOY.md).
+
+## 7. Testes automatizados em GitHub Actions
+
+São **dois workflows**, disparados a cada push em qualquer branch e a cada pull request para a `main`. O resultado aparece nos selos do topo deste README.
+
+| Workflow | O que testa | Como roda |
+|---|---|---|
+| [`testes-api.yml`](.github/workflows/testes-api.yml) | `web/api/tests/`: rotas, serviços e repositórios da API, incluindo CORS e os códigos de erro (404, 422, 503) | o PostgreSQL 16 sobe como serviço do próprio job, com healthcheck; a suíte cria o banco de teste e aplica o mesmo `01-schema.sql` usado em produção |
+| [`testes-terminal.yml`](.github/workflows/testes-terminal.yml) | `tests/`: a estrutura de grafo e seus algoritmos, a persistência do `grafo.txt` e as regras do pipeline (RN01, filtro de votações de mérito, montagem do grafo) | sem nenhuma infraestrutura |
+
+Ao todo são cerca de 250 casos de teste em `pytest`. Nenhum depende da API no ar, de carga de dados ou do Portal da Câmara, então os testes rodam em segundos e não falham por indisponibilidade de terceiros. A API também tem uma coleção Postman ([`web/api/postman/`](web/api/postman/)) para testes de contrato. Os detalhes estão na [seção 5.6](#56-testes-automatizados).
+
+## 8. Como foi o processo de deploy
+
+A aplicação foi publicada em três partes, todas no plano gratuito: **banco no Neon**, **API como web service no Render** e **interface como site estático no Render**. A ordem foi esta:
+
+1. **Banco no Neon.** Criamos o projeto PostgreSQL 16 na região us-east-1, a mesma do Render, para reduzir a latência entre API e banco. O Neon fornece duas strings de conexão: a *pooled*, para a API, e a *direta*, para o schema e a carga.
+2. **Schema.** Aplicamos o `infra/db/init/01-schema.sql` uma única vez, pela string direta, com `psql`.
+3. **Carga dos dados.** Rodamos o `pipeline/carga.py` da nossa máquina, apontando para o Neon. Ele baixou os CSVs de 2024, calculou concordâncias e layout e gravou 535 deputados e 2.290 arestas numa transação só.
+4. **Render via Blueprint.** A infraestrutura dos dois serviços está descrita em código no [`render.yaml`](render.yaml). No Render, bastou criar um *Blueprint* apontando para o repositório e informar a `DATABASE_URL` (string pooled) no painel. A senha nunca vai para o código.
+5. **Ligação entre interface e API.** O site estático tem uma regra de *rewrite* que repassa `/api/*` para a URL pública da API. Com isso, página e API ficam no mesmo domínio, sem configurar CORS, e o frontend usa o mesmo `/api` do ambiente local.
+6. **Verificação.** Conferimos as rotas com `curl` (direto na API e passando pelo rewrite) e consultamos o banco no Neon.
+
+A partir daí, **cada push na `main` faz o Render publicar de novo** automaticamente, e o `buildFilter` reconstrói só o serviço cuja pasta mudou. O passo a passo reproduzível está em [`docs/DEPLOY.md`](docs/DEPLOY.md), e as decisões e alternativas descartadas estão na [seção 5.8](#58-deploy-na-nuvem-decisões-e-motivos) e no [ADR de carga e deploy](docs/adr/carga_e_deploy.md).
+
+## 9. Dificuldades e experiências no deploy
+
+- **O banco gratuito do Render expira em 30 dias.** O caminho mais simples seria colocar tudo no Render, mas o banco sumiria antes do fim do semestre. Separamos o banco no Neon, que não expira. A lição foi ler os limites do plano gratuito *antes* de escolher a arquitetura, e não depois.
+- **O Render não roda `docker compose`, e o plano gratuito não tem cron, jobs nem shell.** Localmente, a carga é um serviço do compose que roda antes da API. Na nuvem, esse passo não tinha onde rodar. A saída foi rodar a carga da nossa máquina direto no Neon, o que só foi seguro porque já tínhamos tornado a carga **idempotente** e **transacional**: rodar de novo não duplica nada, e uma falha não deixa dados pela metade.
+- **Duas strings de conexão para o mesmo banco.** A API abre muitas conexões curtas, que o *pooler* do Neon reaproveita bem. Já o schema e a carga são operações longas, que não combinam com o pooler. Entender a diferença entre a string *pooled* e a *direta* foi um dos pontos que mais exigiu leitura da documentação.
+- **Hibernação.** A API dorme depois de 15 minutos sem acesso e leva cerca de um minuto para acordar; o Neon também suspende o banco. Na primeira versão, isso aparecia para o usuário como erro. Mudamos o frontend para reconhecer o servidor acordando (falha de rede, 502/503/504 ou resposta que não é JSON) e tentar de novo, com aviso na tela.
+- **O rewrite precisa da URL pública da API.** Apontar para o endereço interno do Render resulta em erro 502, e se o Render der outro nome ao serviço, o rewrite quebra. Por isso deixamos documentado um plano B, com CORS, caso o rewrite falhe.
+- **Segredos.** As strings do Neon contêm a senha do banco. Passamos a ignorar todos os arquivos `.env.*` no Git e a cadastrar a `DATABASE_URL` só no painel do Render.
+- **Diferenças entre o ambiente local e a nuvem.** O schema roda sozinho no container local, mas no Neon é manual. E um `.env` salvo no Windows, com fim de linha CRLF, quebrou o compose: a senha do banco chegava com um `\r` no final. Desde então, o `.gitattributes` força LF nos arquivos de configuração e de código.
+
+**O que levamos da experiência:** descrever a infraestrutura em código (`render.yaml`, `docker-compose.yml`) fez o deploy ser reproduzível e revisável como qualquer outra mudança. E as decisões que pareciam só de "boa prática" no começo (pipeline separado da API, carga idempotente, testes que não dependem de serviços externos) foram exatamente as que tornaram o deploy possível dentro das restrições do plano gratuito.
+
+---
+
+# Parte II — Documentação técnica
+
 ## Capítulo 1 – Introdução
 
 Este documento descreve o produto de software desenvolvido pelo grupo ao longo do semestre na disciplina de Laboratório de Engenharia de Software.
 
-O produto, batizado de **"O Gabinete"**, é uma aplicação que constrói e visualiza um **grafo de similaridade entre deputados federais brasileiros**, a partir de dados públicos de votações nominais disponibilizados pela Câmara dos Deputados. A proposta nasceu na disciplina de Teoria dos Grafos e é aqui detalhada sob a ótica da Engenharia de Software: levantamento de requisitos, casos de uso, protótipo de interface (wireframe) e arquitetura da solução.
+O produto, batizado de **"O Gabinete"**, é uma aplicação que constrói e visualiza um **grafo de similaridade entre deputados federais brasileiros**, a partir de dados públicos de votações nominais disponibilizados pela Câmara dos Deputados. A proposta nasceu na disciplina de Teoria dos Grafos e é aqui detalhada sob a ótica da Engenharia de Software: levantamento de requisitos, casos de uso e arquitetura da solução.
 
 ---
 
@@ -157,39 +337,15 @@ A tabela abaixo compõe o **backlog do produto**, com os requisitos ordenados po
 
 ---
 
-## Capítulo 4 – Wireframes
+## Capítulo 4 – Modelagem Leve do Sistema (Casos de Uso)
 
-Protótipos de **baixa fidelidade** (estrutura e navegação, sem esquema de cores definitivo) das três telas principais do sistema.
-
-### 4.1 Tela principal — Grafo de similaridade
-
-Tela inicial: busca de deputados, filtros (partido, UF, legislatura), área central com o grafo interativo, painel de legenda e estatísticas.
-
-![Wireframe - Tela principal do grafo](docs/ihc/wireframes/wireframe-01-grafo-principal.svg)
-
-### 4.2 Painel de perfil do deputado
-
-Aberto ao clicar em um nó (deputado) do grafo: exibe foto, nome, partido/UF, resumo de votações e ações rápidas (comparar, ver perfil completo).
-
-![Wireframe - Painel de perfil do deputado](docs/ihc/wireframes/wireframe-02-perfil-deputado.svg)
-
-### 4.3 Tela de comparação entre dois deputados
-
-Exibe os dois perfis lado a lado, o percentual de similaridade calculado e a lista de proposições em que os votos convergiram ou divergiram.
-
-![Wireframe - Tela de comparação](docs/ihc/wireframes/wireframe-03-comparacao.svg)
-
----
-
-## Capítulo 5 – Modelagem Leve do Sistema (Casos de Uso)
-
-### 5.1 Atores
+### 4.1 Atores
 
 - **Usuário (Cidadão/Analista)** — ator principal; busca visualizar e comparar deputados para entender padrões de comportamento político.
 - **Responsável pela base (grupo/administrador)** — ator principal responsável por manter a base de dados atualizada.
 - **Portal de Dados Abertos da Câmara dos Deputados** — ator de suporte; fornece os dados de deputados e votações consumidos pelo sistema.
 
-### 5.2 Casos de uso (forma resumida)
+### 4.2 Casos de uso (forma resumida)
 
 | Caso de uso | Descrição resumida |
 |---|---|
@@ -201,7 +357,7 @@ Exibe os dois perfis lado a lado, o percentual de similaridade calculado e a lis
 | **UC06 – Importar/Atualizar dados da Câmara** | O responsável pela base aciona a importação de dados atualizados de deputados e votações a partir do Portal de Dados Abertos da Câmara. |
 | **UC07 – Operar o grafo pelo terminal** | O responsável pela base carrega o arquivo do grafo, insere ou remove vértices e arestas, consulta a estrutura e analisa a conexidade, gravando as alterações de volta no arquivo. |
 
-### 5.3 Caso de uso completo — UC01: Visualizar grafo de similaridade
+### 4.3 Caso de uso completo — UC01: Visualizar grafo de similaridade
 
 > Escolhido por ser o caso de uso mais crítico do sistema: é o ponto de entrada principal e a funcionalidade que sustenta o valor central do produto.
 
@@ -229,7 +385,7 @@ Exibe os dois perfis lado a lado, o percentual de similaridade calculado e a lis
 
 **Frequência de uso:** Alta — é o caso de uso executado a cada acesso à aplicação.
 
-### 5.4 Diagrama de caso de uso (UML)
+### 4.4 Diagrama de caso de uso (UML)
 
 ```mermaid
 flowchart LR
@@ -261,9 +417,9 @@ flowchart LR
 
 ---
 
-## Capítulo 6 – Arquitetura do Sistema
+## Capítulo 5 – Arquitetura do Sistema
 
-### 6.1 Visão geral
+### 5.1 Visão geral
 
 A arquitetura segue o **padrão em camadas** e tem duas formas de execução, que compartilham o mesmo pipeline de dados:
 
@@ -306,7 +462,7 @@ flowchart TB
     Usuario --> W1 -->|"/api/ (proxy) · JSON"| W2 -->|SQL| W3
 ```
 
-### 6.2 Descrição das camadas
+### 5.2 Descrição das camadas
 
 | Camada | Módulos | Responsabilidade |
 |---|---|---|
@@ -338,7 +494,7 @@ A dependência aponta sempre para baixo, e as camadas são fechadas: a apresenta
 
 A validação dos parâmetros não é escrita à mão: o FastAPI a deriva das anotações de tipo na assinatura de cada rota, e por isso valor fora da faixa devolve 422 sem nenhum `if`. A documentação interativa em `/docs` é gerada da mesma fonte.
 
-### 6.3 Estrutura de diretórios
+### 5.3 Estrutura de diretórios
 
 ```
 o-gabinete/
@@ -412,7 +568,7 @@ o-gabinete/
 └── requirements-notebook.txt   pipeline + Jupyter, para o view-CSV.ipynb
 ```
 
-### 6.4 Tecnologias
+### 5.4 Tecnologias
 
 | Categoria | Tecnologia | Onde é usada |
 |---|---|---|
@@ -434,7 +590,7 @@ o-gabinete/
 | Fonte de dados | Portal de Dados Abertos da Câmara dos Deputados | pipeline |
 | Controle de versão | Git e GitHub | todo o projeto |
 
-### 6.5 Como executar
+### 5.5 Como executar
 
 O projeto tem duas aplicações independentes, com preparações diferentes:
 
@@ -610,7 +766,7 @@ python grafos/main.py
 | `service "carga" didn't complete successfully` | a carga falhou (Câmara fora do ar, tabela faltando...) | `docker compose logs carga` mostra o motivo; corrija e suba de novo |
 | senha recusada mesmo com o `.env` certo, ou `\r` no fim de uma variável | `.env` salvo com CRLF no Windows | salve com LF (o `.gitattributes` já força LF nos arquivos versionados) |
 
-### 6.6 Testes automatizados
+### 5.6 Testes automatizados
 
 O projeto tem três suítes, com papéis diferentes e que não se substituem:
 
@@ -751,7 +907,7 @@ npx newman run web/api/postman/O_Gabinete.postman_collection.json
 
 Também é possível gerar uma coleção automaticamente a partir do contrato que o FastAPI publica, por **Import → Link** com `http://localhost:8000/openapi.json`. Essa versão traz as rotas e os parâmetros, mas sem nenhuma verificação: serve para explorar, não para testar.
 
-### 6.7 Protótipo publicado
+### 5.7 Protótipo publicado
 
 **<https://hissapinto.github.io/o-gabinete/web/prototipo/>**
 
@@ -808,7 +964,7 @@ Detalhes do contrato dos JSONs e das decisões visuais estão em [`web/prototipo
 
 A decisão de publicar um espelho estático do contrato da API, em vez de hospedar a aplicação inteira, está registrada no [ADR-0004](docs/adr/prototipo_estatico.md).
 
-### 6.8 Deploy na nuvem: decisões e motivos
+### 5.8 Deploy na nuvem: decisões e motivos
 
 A aplicação está no ar em <https://o-gabinete.onrender.com>. A interface e a API rodam no **Render** e o banco PostgreSQL no **Neon**, todos no plano gratuito. O passo a passo está em [`docs/DEPLOY.md`](docs/DEPLOY.md) e o registro completo da decisão no [ADR de carga e deploy](docs/adr/carga_e_deploy.md).
 
