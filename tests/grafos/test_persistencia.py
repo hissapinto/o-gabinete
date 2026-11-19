@@ -18,6 +18,9 @@ Sintese:
 
 Historico de alteracoes:
     04/11/2026 - Isabela - Criacao.
+    19/11/2026 - Kaique - Testes das validacoes pedidas no parecer da parte 2:
+                          pesos fora de 0-100, indices e arestas repetidos,
+                          lacos e contagens negativas.
 """
 
 import pytest
@@ -166,3 +169,55 @@ def test_faltam_linhas_de_aresta(tmp_path):
 def test_aresta_com_vertice_inexistente(tmp_path):
     with pytest.raises(persistencia.ErroDeArquivo, match="aresta invalida"):
         persistencia.ler(escrever(tmp_path, '2\n2\n0 "Ana"\n1 "Bruno"\n1\n0 9 50\n'))
+
+
+# --- validacoes do parecer da parte 2 -------------------------------------
+
+@pytest.mark.parametrize("peso", [-1, 101, 150])
+def test_peso_fora_do_intervalo_e_rejeitado(tmp_path, peso):
+    texto = f'2\n2\n0 "Ana"\n1 "Bruno"\n1\n0 1 {peso}\n'
+    with pytest.raises(persistencia.ErroDeArquivo, match="peso fora do intervalo"):
+        persistencia.ler(escrever(tmp_path, texto))
+
+
+@pytest.mark.parametrize("peso", [0, 100])
+def test_pesos_nos_limites_sao_aceitos(tmp_path, peso):
+    texto = f'2\n2\n0 "Ana"\n1 "Bruno"\n1\n0 1 {peso}\n'
+    assert persistencia.ler(escrever(tmp_path, texto)).peso(0, 1) == peso
+
+
+def test_indice_de_vertice_repetido_e_rejeitado(tmp_path):
+    texto = '2\n2\n0 "Ana"\n0 "Bruno"\n0\n'
+    with pytest.raises(persistencia.ErroDeArquivo, match="indice de vertice repetido"):
+        persistencia.ler(escrever(tmp_path, texto))
+
+
+def test_aresta_repetida_e_rejeitada(tmp_path):
+    texto = '2\n2\n0 "Ana"\n1 "Bruno"\n2\n0 1 50\n1 0 60\n'
+    with pytest.raises(persistencia.ErroDeArquivo, match="aresta repetida"):
+        persistencia.ler(escrever(tmp_path, texto))
+
+
+def test_laco_e_rejeitado(tmp_path):
+    texto = '2\n2\n0 "Ana"\n1 "Bruno"\n1\n1 1 50\n'
+    with pytest.raises(persistencia.ErroDeArquivo, match="laco"):
+        persistencia.ler(escrever(tmp_path, texto))
+
+
+def test_numero_de_vertices_negativo_e_rejeitado(tmp_path):
+    with pytest.raises(persistencia.ErroDeArquivo, match="vertices negativo"):
+        persistencia.ler(escrever(tmp_path, '2\n-3\n0\n'))
+
+
+def test_numero_de_arestas_negativo_e_rejeitado(tmp_path):
+    texto = '2\n2\n0 "Ana"\n1 "Bruno"\n-1\n'
+    with pytest.raises(persistencia.ErroDeArquivo, match="arestas negativo"):
+        persistencia.ler(escrever(tmp_path, texto))
+
+
+def test_arquivo_real_do_projeto_continua_valido():
+    """O dados/grafo.txt entregue tem de passar pelas novas validacoes."""
+    grafo = persistencia.ler(persistencia.CAMINHO_PADRAO)
+
+    assert grafo.n == 535
+    assert grafo.m == 2290

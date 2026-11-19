@@ -443,7 +443,7 @@ flowchart TB
 
     subgraph Terminal["Aplicação de terminal"]
         F["Persistência<br/>persistencia.py"]
-        G["Negócio<br/>grafo.py · logica_grafos.py"]
+        G["Negócio<br/>grafo.py · logica_grafos.py<br/>blocos.py · caracteristicas.py"]
         H["Apresentação<br/>menu.py"]
     end
 
@@ -466,9 +466,9 @@ flowchart TB
 
 | Camada | Módulos | Responsabilidade |
 |---|---|---|
-| **Pipeline** (subsistema offline) | `pipeline/coleta.py`, `pipeline/processamento.py`, `pipeline/similaridade.py`, `pipeline/gerar_grafo.py`, `pipeline/layout.py`, `pipeline/carga.py` | Baixar os CSVs, filtrar as votações de mérito, calcular a concordância entre deputados, gerar o arquivo do grafo, calcular a posição de cada vértice no desenho e carregar o banco da versão web. Único lugar onde `pandas`, `numpy` e `networkx` são utilizados. |
+| **Pipeline** (subsistema offline) | `pipeline/coleta.py`, `pipeline/processamento.py`, `pipeline/similaridade.py`, `pipeline/gerar_grafo.py`, `pipeline/layout.py`, `pipeline/carga.py`, `pipeline/sensibilidade.py` | Baixar os CSVs, filtrar as votações de mérito, calcular a concordância entre deputados, gerar o arquivo do grafo, calcular a posição de cada vértice no desenho, carregar o banco da versão web e medir a sensibilidade das conclusões aos parâmetros do modelo. Único lugar onde `pandas`, `numpy` e `networkx` são utilizados. |
 | **Apresentação** | `grafos/apresentacao/menu.py` (terminal), `web/frontend/` (web: `index.html`, `css/`, `js/`) | Interação com o usuário, em duas formas: menu de terminal e interface web. Na web, `js/dados.js` é o único módulo que chama a API. |
-| **Negócio** | `grafos/negocio/grafo.py`, `grafos/negocio/grafoLista.py`, `grafos/negocio/logica_grafos.py` | Estrutura do grafo (lista de adjacência, a partir da classe apresentada em aula) e algoritmos de análise, entre eles a conexidade. |
+| **Negócio** | `grafos/negocio/grafo.py`, `grafos/negocio/grafoLista.py`, `grafos/negocio/logica_grafos.py`, `grafos/negocio/blocos.py`, `grafos/negocio/caracteristicas.py` | Estrutura do grafo (lista de adjacência, a partir da classe apresentada em aula) e algoritmos de análise: conexidade, blocos de votação pela árvore geradora máxima (Kruskal) e características do grafo (grau, Euler, Hamilton com articulações e pontes, coloração de Welsh-Powell). |
 | **API** (versão web) | `web/api/` (`main.py`, `banco.py`, `rotas/`, `servicos/`, `repositorios/`) | Endpoints REST em FastAPI. Dividida internamente: `rotas/` recebe o HTTP, `servicos/` aplica a regra de negócio, `repositorios/` executa o SQL e `banco.py` é o único módulo que conhece a `DATABASE_URL`. |
 | **Persistência** | `grafos/persistencia/persistencia.py` | Leitura e gravação do arquivo `grafo.txt`, encapsulando o conhecimento do formato. |
 | **Dados** | `dados/grafo.txt`, banco PostgreSQL (`infra/db/init/01-schema.sql`) | O arquivo guarda o grafo da aplicação de terminal; o banco guarda os dados da versão web. |
@@ -519,7 +519,9 @@ o-gabinete/
 │   │   ├── grafo.py
 │   │   ├── grafoLista.py
 │   │   ├── filaCircular.py
-│   │   └── logica_grafos.py
+│   │   ├── logica_grafos.py
+│   │   ├── blocos.py           árvore geradora máxima e blocos de votação
+│   │   └── caracteristicas.py  grau, Euler, Hamilton e coloração
 │   ├── persistencia/           camada de persistência
 │   │   └── persistencia.py
 │   └── main.py                 ponto de entrada do terminal
@@ -868,7 +870,10 @@ tests/
 │   ├── test_fila_circular.py    a fila da aula, com a volta dos índices
 │   ├── test_grafo.py            lista de adjacência, pesos e remoção de vértice
 │   ├── test_logica_grafos.py    componentes conexas, conexidade e isolados
-│   └── test_persistencia.py     ida e volta do formato do `grafo.txt`
+│   ├── test_persistencia.py     ida e volta do formato do `grafo.txt` e registros inválidos
+│   ├── test_blocos.py           Kruskal, corte da árvore, blocos e modularidade
+│   ├── test_caracteristicas.py  grau, Euler, Hamilton, articulações e coloração
+│   └── test_menu.py             menu de ponta a ponta com o `grafo.txt` real
 └── pipeline/
     ├── test_similaridade.py     a RN01 do lado do pipeline
     ├── test_processamento.py    o filtro de votações de mérito

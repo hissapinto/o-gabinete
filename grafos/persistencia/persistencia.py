@@ -24,6 +24,10 @@ Sintese:
 Historico de alteracoes:
     24/09/2026 - Grupo - Criacao da leitura e da gravacao.
     18/10/2026 - Isabela - Caminho do cabecalho atualizado apos a reorganizacao das pastas.
+    19/11/2026 - Kaique - Leitura passa a rejeitar registros invalidos, conforme
+                          o parecer da parte 2: contagens negativas, indices de
+                          vertice repetidos, arestas repetidas, lacos e pesos
+                          fora do intervalo de 0 a 100.
 """
 
 import os
@@ -31,6 +35,10 @@ import os
 from grafo import GrafoPonderadoND
 
 CAMINHO_PADRAO = os.path.join("dados", "grafo.txt")
+
+# Intervalo aceito para o peso da aresta: percentual de votos coincidentes.
+PESO_MINIMO = 0
+PESO_MAXIMO = 100
 
 
 class ErroDeArquivo(Exception):
@@ -62,16 +70,22 @@ def ler(caminho=CAMINHO_PADRAO):
     # quantidade de vertices
     n = _inteiro(linhas[posicao], "numero de vertices")
     posicao += 1
+    if n < 0:
+        raise ErroDeArquivo(f"numero de vertices negativo: {n}")
 
     grafo = GrafoPonderadoND(n)
 
-    # rotulos dos vertices
-    for i in range(n):
+    # rotulos dos vertices: cada indice de 0 a n-1 tem de aparecer uma vez so
+    indices_lidos = set()
+    for _ in range(n):
         if posicao >= len(linhas):
             raise ErroDeArquivo("faltam linhas de vertice")
         indice, rotulo = _separaVertice(linhas[posicao])
         if not grafo.existeV(indice):
             raise ErroDeArquivo(f"indice de vertice invalido: {indice}")
+        if indice in indices_lidos:
+            raise ErroDeArquivo(f"indice de vertice repetido: {indice}")
+        indices_lidos.add(indice)
         grafo.rotulos[indice] = rotulo
         posicao += 1
 
@@ -80,6 +94,8 @@ def ler(caminho=CAMINHO_PADRAO):
         raise ErroDeArquivo("faltou o numero de arestas")
     m = _inteiro(linhas[posicao], "numero de arestas")
     posicao += 1
+    if m < 0:
+        raise ErroDeArquivo(f"numero de arestas negativo: {m}")
 
     # arestas
     for _ in range(m):
@@ -91,6 +107,16 @@ def ler(caminho=CAMINHO_PADRAO):
         v = _inteiro(partes[0], "vertice de origem")
         w = _inteiro(partes[1], "vertice de destino")
         peso = _inteiro(partes[2], "peso da aresta")
+
+        if not PESO_MINIMO <= peso <= PESO_MAXIMO:
+            raise ErroDeArquivo(
+                f"peso fora do intervalo {PESO_MINIMO}-{PESO_MAXIMO}: {linhas[posicao]}"
+            )
+        if v == w:
+            raise ErroDeArquivo(f"laco nao permitido: {linhas[posicao]}")
+        # insereA atualizaria o peso em silencio; no arquivo, repetir e erro
+        if grafo.existeA(v, w):
+            raise ErroDeArquivo(f"aresta repetida: {v} {w}")
         if not grafo.insereA(v, w, peso):
             raise ErroDeArquivo(f"aresta invalida: {v} {w}")
         posicao += 1
