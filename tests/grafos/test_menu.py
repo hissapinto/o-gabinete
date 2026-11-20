@@ -16,6 +16,7 @@ Sintese:
 
 Historico de alteracoes:
     19/11/2026 - Caio - Criacao.
+    20/11/2026 - Kaique - Teste da opcao (g) com arquivo invalido.
 """
 
 import menu
@@ -109,3 +110,25 @@ def test_opcoes_novas_exigem_grafo_carregado(monkeypatch, capsys):
     saida = rodar(monkeypatch, capsys, entradas + ["o"])
 
     assert saida.count("Nenhum grafo carregado") == 5
+
+
+def test_opcao_g_com_arquivo_invalido_mostra_o_motivo(monkeypatch, capsys, tmp_path):
+    """A opcao (g) passa pela mesma validacao da leitura antes de mostrar."""
+    arquivo = tmp_path / "invalido.txt"
+    arquivo.write_text('2\n2\n0 "Ana"\n1 "Bruno"\n1\n0 1 150\n', encoding="utf-8")
+    app = menu.Aplicacao()
+    app.caminho = str(arquivo)
+    monkeypatch.setattr("builtins.input", lambda _m="": "n")
+
+    menu.opcao_g_conteudo(app)
+    saida = capsys.readouterr().out
+
+    assert "Nao foi possivel mostrar o arquivo: peso fora do intervalo" in saida
+    assert "Vertices ..." not in saida
+
+
+def test_opcao_j_com_minimo_20_mantem_o_psol_como_bloco(monkeypatch, capsys):
+    saida = rodar(monkeypatch, capsys, sessao(["j", "3", "20", "", "n"]))
+
+    assert "Bloco 3: 14 deputado(s)" in saida
+    assert "Grupo avulso" not in saida

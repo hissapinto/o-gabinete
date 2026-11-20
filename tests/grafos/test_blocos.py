@@ -15,6 +15,8 @@ Sintese:
 
 Historico de alteracoes:
     19/11/2026 - Kaique - Criacao.
+    20/11/2026 - Kaique - Teste da componente menor que o tamanho minimo, que
+                          passou a contar como bloco.
 """
 
 import pytest
@@ -217,3 +219,17 @@ def test_sensibilidade_tem_uma_linha_por_combinacao(dois_grupos):
     assert len(linhas) == 4
     assert {(l["num_blocos"], l["tamanho_minimo"]) for l in linhas} == {
         (1, 1), (2, 1), (1, 2), (2, 2)}
+
+
+def test_componente_menor_que_o_minimo_conta_como_bloco():
+    """
+    O trio 4-5-6 ja vem separado pelos votos. Mesmo com tamanho minimo 5 ele
+    e um bloco: o minimo so impede cortes que isolem poucos deputados.
+    """
+    g = montar(7, [(0, 1, 90), (1, 2, 90), (2, 3, 90), (4, 5, 90), (5, 6, 90)])
+
+    resultado = blocos.detectar_blocos(g, 2, 5)
+
+    assert resultado["cortes"] == []
+    assert resultado["significativos"] == 2
+    assert resultado["blocos"] == [[0, 1, 2, 3], [4, 5, 6]]

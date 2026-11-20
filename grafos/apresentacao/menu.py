@@ -19,6 +19,9 @@ Historico de alteracoes:
                           pela arvore geradora maxima, opcoes (k) a (n) com as
                           caracteristicas do grafo (grau, Euler, Hamilton e
                           coloracao) e encerramento movido para a opcao (o).
+    20/11/2026 - Kaique - Opcao (g) valida o arquivo antes de mostrar, com a
+                          mesma mensagem da leitura, em vez de cair no erro
+                          generico do menu com um arquivo invalido.
 """
 
 import persistencia
@@ -286,15 +289,13 @@ def opcao_g_conteudo(app):
 
     try:
         bruto = persistencia.conteudo(app.caminho)
+        # passa pela mesma validacao da opcao (a) antes de interpretar o texto
+        persistencia.ler(app.caminho)
     except persistencia.ErroDeArquivo as erro:
-        print(f"\n  Nao foi possivel ler o arquivo: {erro}")
+        print(f"\n  Nao foi possivel mostrar o arquivo: {erro}")
         return
 
     linhas = [linha for linha in bruto.splitlines() if linha.strip()]
-    if len(linhas) < 2:
-        print("\n  O arquivo esta vazio ou incompleto.")
-        return
-
     tipo = linhas[0].strip()
     n = int(linhas[1].split()[0])
     inicio_arestas = 2 + n

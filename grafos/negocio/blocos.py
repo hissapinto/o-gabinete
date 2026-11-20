@@ -32,6 +32,9 @@ Sintese:
 Historico de alteracoes:
     19/11/2026 - Kaique - Criacao: Kruskal, corte da arvore, resumo dos blocos,
                           modularidade e analise de sensibilidade.
+    20/11/2026 - Kaique - Componente ja separada pelos votos conta como bloco
+                          mesmo menor que o tamanho minimo, que passa a valer
+                          so para os cortes (o PSOL nao vira mais "avulso").
 """
 
 import re
@@ -148,19 +151,21 @@ def detectar_blocos(grafo, num_blocos=4, tamanho_minimo=10):
     Divide os deputados em blocos de votacao cortando a floresta geradora
     maxima nas arestas mais fracas.
 
-    num_blocos     : quantidade de blocos desejada. Componentes conexas com
-                     pelo menos tamanho_minimo vertices ja contam como blocos.
+    num_blocos     : quantidade de blocos desejada. As componentes conexas
+                     com pelo menos 2 deputados ja contam como blocos: foram
+                     os proprios votos que as separaram.
     tamanho_minimo : um corte so vale se os dois lados ficarem com pelo menos
-                     essa quantidade de deputados. Componentes menores que
-                     isso (deputados isolados, por exemplo) sao devolvidas
-                     como grupos avulsos e nao contam para num_blocos.
+                     essa quantidade de deputados. O minimo vale so para os
+                     cortes, para que eles nao isolem um deputado de cada vez.
+                     Deputados sem nenhuma aresta sao devolvidos como grupos
+                     avulsos e nao contam para num_blocos.
 
     Devolve um dicionario com:
         'floresta' : arestas da floresta geradora maxima
         'cortes'   : arestas cortadas, da mais fraca para a mais forte
         'blocos'   : lista de grupos (listas de vertices), do maior ao menor;
                      os 'significativos' primeiros sao os blocos de verdade
-        'significativos' : quantos grupos tem pelo menos tamanho_minimo
+        'significativos' : quantos grupos contam como bloco
     Se nao houver cortes validos suficientes, 'significativos' fica menor
     que num_blocos; quem chama compara os dois.
     """
@@ -171,9 +176,9 @@ def detectar_blocos(grafo, num_blocos=4, tamanho_minimo=10):
 
     floresta = arvore_geradora_maxima(grafo)
     adj = _adjacencia(grafo.n, floresta)
-    # so os grupos grandes o bastante contam como bloco; um corte valido
-    # divide um bloco em dois blocos, somando exatamente um
-    quantidade = sum(1 for c in _componentes(adj) if len(c) >= tamanho_minimo)
+    # componentes ja separadas contam como bloco (um deputado sozinho, nao);
+    # cada corte valido divide um bloco em dois, somando exatamente um
+    quantidade = sum(1 for c in _componentes(adj) if len(c) >= 2)
 
     cortes = []
     # da aresta mais fraca para a mais forte; empate pelos indices

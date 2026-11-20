@@ -34,6 +34,9 @@ Sintese:
 
 Historico de alteracoes:
     19/11/2026 - Caio - Criacao.
+    20/11/2026 - Kaique - Correcao da verificacao de "PSOL isolado", que
+                          ignorava a maior componente e falhava em empate de
+                          tamanho (achado pelo teste automatizado novo).
 """
 
 import os
@@ -81,12 +84,14 @@ def medir(g):
     partido = [blocos.partido_do_rotulo(g.rotulo(v)) for v in range(g.n)]
     do_partido = {v for v in range(g.n) if partido[v] == PARTIDO_ANALISADO}
 
-    # componente que contem a bancada analisada: isolada se so tiver ela e
-    # no maximo poucos de fora, e se nenhum membro estiver na componente gigante
+    # A bancada esta isolada quando todos os seus deputados estao numa mesma
+    # componente formada principalmente por eles (menos gente de fora do que
+    # da bancada). Nao depende da ordem das componentes, o que importa quando
+    # duas componentes tem o mesmo tamanho.
     isolada = False
-    for c in comps[1:]:
+    for c in comps:
         if do_partido and do_partido <= set(c):
-            isolada = True
+            isolada = len(set(c) - do_partido) < len(do_partido)
 
     res = blocos.detectar_blocos(g, 3, 10)
     return {
