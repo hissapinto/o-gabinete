@@ -22,6 +22,7 @@
  *                         aviso do partido destacado.
  *     27/11/2026 - Kaique - Abas da legenda e lista dos deputados fora do grafo,
  *                           e os tokens --grafo-fora-* dos pontos cinza.
+ *     27/11/2026 - Kaique - Logo do CIBERDEM ao lado do icone da marca.
  */
 
 /* --- tokens: tema claro (padrao) ----------------------------------------- */
@@ -273,6 +274,7 @@ a { color: var(--tinta-2); }
   flex: none;
 }
 .marca-icone { width: 38px; height: 38px; color: var(--tinta); }
+.marca-ciberdem { width: 38px; height: 38px; border-radius: 6px; flex: none; }
 .marca-icone .apagada { color: var(--tinta-3); }
 .marca-texto { display: flex; flex-direction: column; line-height: 1.1; }
 .marca-nome {
@@ -980,7 +982,7 @@ a { color: var(--tinta-2); }
     gap: var(--e2);
     padding: var(--e2) var(--e4);
   }
-  .marca-icone { width: 28px; height: 28px; }
+  .marca-icone, .marca-ciberdem { width: 28px; height: 28px; }
   .marca-nome { font-size: 21px; }
   .marca-texto { flex-direction: row; align-items: baseline; gap: var(--e2); }
   .marca-sub { display: inline; font-size: 11px; }

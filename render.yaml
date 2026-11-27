@@ -32,7 +32,7 @@ services:
     runtime: static
     # Sem build de verdade: so separa os arquivos da pagina, para Dockerfile
     # e nginx.conf nao virarem arquivos publicos.
-    buildCommand: mkdir -p dist && cp -r web/frontend/index.html web/frontend/css web/frontend/js dist/
+    buildCommand: mkdir -p dist && cp -r web/frontend/index.html web/frontend/css web/frontend/js web/frontend/img dist/
     staticPublishPath: ./dist
     buildFilter:
       paths:
