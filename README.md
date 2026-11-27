@@ -7,7 +7,7 @@
 | Endereço | O que é |
 |---|---|
 | **<https://o-gabinete.onrender.com>** | a aplicação: grafo interativo de similaridade entre os deputados federais, um por ano |
-| <https://o-gabinete-api.onrender.com/docs> | a API, com documentação interativa das seis rotas |
+| <https://o-gabinete-api.onrender.com/docs> | a API, com documentação interativa das sete rotas |
 | <https://hissapinto.github.io/o-gabinete/web/prototipo/> | protótipo de alta fidelidade (Interação Humano-Computador) |
 
 > No plano gratuito a aplicação hiberna após 15 minutos sem acesso, e a primeira visita leva cerca de um minuto para carregar. Ela avisa na tela enquanto o servidor acorda.
@@ -88,7 +88,7 @@ O projeto se alinha ao **ODS 16** (instituições eficazes e acesso à informaç
 - **Seletor de ano**, já preparado para vários anos de dados.
 - **Tema claro e escuro.**
 - **Tolerância ao servidor dormindo**: enquanto a API acorda, a interface tenta de novo por até cerca de 90 segundos e avisa o usuário.
-- **API REST** com seis rotas, incluindo a comparação entre dois deputados com as votações em que concordaram e divergiram.
+- **API REST** com sete rotas, incluindo a comparação entre dois deputados com as votações em que concordaram e divergiram.
 - **Aplicação de terminal** com menu para ler, gravar, inserir e remover vértices e arestas, exibir o grafo e analisar a conexidade.
 - **Pipeline automatizado**: baixa os CSVs da Câmara, filtra as votações de mérito, calcula a concordância, gera o layout e carrega o banco numa transação única e idempotente.
 
@@ -481,7 +481,7 @@ A dependência aponta sempre para baixo, e as camadas são fechadas: a apresenta
 
 **Modelo de dados atual.** O banco tem nove tabelas, divididas em dois blocos. Os dados da Câmara ficam em `deputado`, `proposicao`, `votacao`, `votacao_proposicao` e `voto`; os resultados do pipeline, em `execucao`, `concordancia`, `aresta` e `posicao` (a posição x/y de cada vértice no desenho, chaveada pela execução, como as arestas). Cada execução do `carga.py` registra em `app.execucao` os parâmetros usados (ano, mínimo de votações em comum, número de vizinhos e concordância mínima), de modo que versões diferentes do grafo podem conviver no banco e ser comparadas. As arestas gravadas são as mesmas do `grafo.txt`, porque a carga passa pelas funções do `similaridade.py` e do `gerar_grafo.py`.
 
-**Endpoints da API.** A versão web expõe seis rotas, todas `GET` e todas devolvendo JSON. As duas primeiras não dependem do pipeline; as demais leem sempre a execução mais recente do ano pedido.
+**Endpoints da API.** A versão web expõe sete rotas, todas `GET` e todas devolvendo JSON. As duas primeiras não dependem do pipeline; as demais leem sempre a execução mais recente do ano pedido.
 
 | Rota | Parâmetros opcionais | Devolve | Outros desfechos |
 |---|---|---|---|
@@ -491,6 +491,7 @@ A dependência aponta sempre para baixo, e as camadas são fechadas: a apresenta
 | `/anos/{ano}/grafo` | — | nós (cada um com a posição `x`/`y` do desenho) e arestas da tela inicial | 404 se o ano não tem execução; 500 se algum nó não tem posição gravada ("layout ausente", rode a carga) |
 | `/anos/{ano}/deputados/{id}` | `limite` (1 a 50, padrão 10) | ficha do deputado e os mais similares a ele | 404 se o ano não tem execução ou se ele não votou no ano; 200 com lista vazia se votou mas ficou fora do grafo |
 | `/anos/{ano}/concordancias/{a}/{b}` | `tipo` (`todas`, `concordancia`, `divergencia`), `limite` (sem limite por padrão), `offset` | contadores do par e as votações em que concordaram e divergiram, em duas listas | 422 se os dois ids forem iguais; 404 se o ano não tem execução ou se algum deles não votou; `status: "insuficiente"` se o par não tem concordância calculada |
+| `/anos/{ano}/fora-do-grafo` | — | deputados que votaram no ano mas não entraram no grafo (nenhum par chegou ao mínimo de votações em comum), com quantas votações nominais cada um votou, quantas presidiu (Artigo 17) e o `motivo` (`presidencia` ou `poucas_votacoes`); traz também o total de votações nominais do ano e o mínimo exigido | 404 se o ano não tem execução |
 
 A validação dos parâmetros não é escrita à mão: o FastAPI a deriva das anotações de tipo na assinatura de cada rota, e por isso valor fora da faixa devolve 422 sem nenhum `if`. A documentação interativa em `/docs` é gerada da mesma fonte.
 
@@ -898,7 +899,7 @@ Dois testes merecem destaque. O `test_par_do_cenario_bate_com_o_da_api` usa exat
 
 #### A coleção do Postman
 
-Para inspeção manual, importe `web/api/postman/O_Gabinete.postman_collection.json` no Postman: **Import → File**. Com a API no ar, use **Run collection** para executar as quatorze requisições em sequência.
+Para inspeção manual, importe `web/api/postman/O_Gabinete.postman_collection.json` no Postman: **Import → File**. Com a API no ar, use **Run collection** para executar as dezesseis requisições em sequência.
 
 Ela não tem ids fixos. Cada requisição descobre o que a próxima precisa a partir da resposta anterior: o ano vem de `/anos`, o par de deputados vem de uma aresta do grafo, e o percentual visto na ficha é comparado com o do endpoint do par. Por isso **rode a coleção inteira**, e não requisições isoladas.
 

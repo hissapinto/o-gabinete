@@ -304,6 +304,71 @@
           "pm.test('responde 422, validado pelo Literal da assinatura', () => pm.response.to.have.status(422));"
         ]}
       }]
+    },
+    {
+      "name": "15. Fora do grafo: GET /anos/{ano}/fora-do-grafo",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/anos/{{ano}}/fora-do-grafo"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('responde 200', () => pm.response.to.have.status(200));",
+              "const c = pm.response.json();",
+              "pm.test('traz ano, totais e a lista', () => {",
+              "  pm.expect(c).to.have.all.keys('ano', 'total_votacoes', 'minimo_em_comum', 'deputados');",
+              "  pm.expect(String(c.ano)).to.eql(pm.collectionVariables.get('ano'));",
+              "  pm.expect(c.total_votacoes).to.be.above(0);",
+              "  pm.expect(c.minimo_em_comum).to.be.above(0);",
+              "  pm.expect(c.deputados).to.be.an('array');",
+              "});",
+              "pm.test('o deputado tem os campos que a tela usa', () => {",
+              "  c.deputados.forEach(d => pm.expect(d).to.have.all.keys('deputado_id', 'nome', 'sigla_partido', 'sigla_uf', 'votacoes', 'artigo_17', 'motivo'));",
+              "});",
+              "pm.test('motivo e presidencia ou poucas_votacoes, coerente com os contadores', () => {",
+              "  c.deputados.forEach(d => {",
+              "    const esperado = d.artigo_17 > d.votacoes ? 'presidencia' : 'poucas_votacoes';",
+              "    pm.expect(d.motivo, `motivo de ${d.deputado_id}`).to.eql(esperado);",
+              "  });",
+              "});",
+              "pm.test('ninguem votou em mais votacoes do que o ano tem', () => {",
+              "  c.deputados.forEach(d => pm.expect(d.votacoes + d.artigo_17).to.be.at.most(c.total_votacoes));",
+              "});",
+              "pm.test('quem votou mais vem primeiro', () => {",
+              "  for (let i = 1; i < c.deputados.length; i++) pm.expect(c.deputados[i - 1].votacoes).to.be.at.least(c.deputados[i].votacoes);",
+              "});",
+              "pm.test('nenhum deputado fora do grafo aparece no par descoberto pelo grafo', () => {",
+              "  const ids = new Set(c.deputados.map(d => String(d.deputado_id)));",
+              "  pm.expect(ids.has(pm.collectionVariables.get('deputadoA'))).to.be.false;",
+              "  pm.expect(ids.has(pm.collectionVariables.get('deputadoB'))).to.be.false;",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "16. Fora do grafo: ano sem execucao devolve 404",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/anos/1900/fora-do-grafo"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('responde 404', () => pm.response.to.have.status(404));",
+              "pm.test('explica o motivo', () => pm.expect(pm.response.json().detail).to.include('1900'));"
+            ]
+          }
+        }
+      ]
     }
   ]
 }
