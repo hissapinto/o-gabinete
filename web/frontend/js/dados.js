@@ -26,6 +26,7 @@
  *                         a ficha pede so os 5 mais similares que a tela usa.
  *     04/11/2026 - Caio - BASE lida do js/config.js e novas tentativas
  *                         enquanto o servidor acorda.
+ *     27/11/2026 - Kaique - Lista dos deputados fora do grafo do ano.
  */
 
 // js/config.js define a base; /api e o proxy do nginx e o rewrite do Render
@@ -135,6 +136,15 @@ export function carregarAnos() {
 /** GET /anos/{ano}/grafo -> { ano, nos: [...], arestas: [...] }. */
 export function carregarGrafo(ano) {
   return buscar(`/anos/${ano}/grafo`);
+}
+
+/**
+ * GET /anos/{ano}/fora-do-grafo -> { ano, total_votacoes, minimo_em_comum,
+ * deputados: [{ deputado_id, nome, sigla_partido, sigla_uf, votacoes, artigo_17, motivo }] }.
+ * Quem votou no ano mas nao entrou no grafo.
+ */
+export function carregarForaDoGrafo(ano) {
+  return buscar(`/anos/${ano}/fora-do-grafo`);
 }
 
 /** GET /anos/{ano}/deputados/{id}?limite=5 -> { ano, deputado, mais_similares }. */

@@ -20,6 +20,9 @@
  *                         e zoom limitado; troca de tema sem recarregar.
  *     05/11/2026 - Isabela - Faixa de similaridade fixa em 75-100% em todos
  *                            os anos, no lugar do minimo/maximo de cada ano.
+ *     27/11/2026 - Kaique - Deputados fora do grafo em cinza, numa grade a
+ *                           parte abaixo do desenho, so com a aba "Fora do
+ *                           grafo" da legenda aberta.
  */
 
 import { corDoPartido, lerCores } from './partidos.js';
@@ -62,6 +65,9 @@ function lerTokens() {
     rotuloTinta: token('rotulo-tinta'),
     rotuloBorda: token('rotulo-borda'),
     apagado: Number(token('apagado-opacidade')),
+    fora: token('fora'),
+    foraBorda: token('fora-borda'),
+    foraRotulo: token('fora-rotulo'),
   };
 }
 
@@ -99,6 +105,37 @@ function montarEstilo(t) {
         'haystack-radius': 0,
         'transition-property': 'opacity, line-color',
         'transition-duration': 180,
+      },
+    },
+    {
+      // Fora do grafo: sem aresta e sem posicao propria. Cinza e tracejado,
+      // para nao parecer parte do desenho; a posicao na grade nao significa nada.
+      selector: 'node.fora',
+      style: {
+        'background-color': t.fora,
+        'border-width': 1.5,
+        'border-style': 'dashed',
+        'border-color': t.foraBorda,
+        'border-opacity': 0.9,
+      },
+    },
+    {
+      // Titulo da grade dos de fora: um no sem cor que so carrega o texto.
+      selector: 'node.rotulo-fora',
+      style: {
+        width: 1,
+        height: 1,
+        'background-opacity': 0,
+        'border-width': 0,
+        label: 'data(rotulo)',
+        color: t.foraRotulo,
+        'font-family': FONTE_GRAFO,
+        'font-size': naTela(FONTE_ROTULO),
+        'font-weight': 600,
+        'text-halign': 'right',
+        'text-valign': 'center',
+        'text-wrap': 'wrap',
+        events: 'no',
       },
     },
     {
@@ -234,7 +271,7 @@ function agendarAtualizacaoDosRotulos() {
   quadroPendente = true;
   requestAnimationFrame(() => {
     quadroPendente = false;
-    cy.nodes('.foco, .similar').updateStyle();
+    cy.nodes('.foco, .similar, .rotulo-fora').updateStyle();
   });
 }
 
@@ -275,6 +312,50 @@ export function desenhar(grafo) {
 
 function margem() {
   return window.innerWidth < 760 ? 24 : 48;
+}
+
+const ESPACO_FORA = 42;     // distancia entre os pontos cinza da grade
+const AFASTAMENTO_FORA = 150; // distancia entre o desenho e a grade
+
+/**
+ * Mostra (lista) ou esconde (null) os deputados fora do grafo, em cinza,
+ * numa grade abaixo do desenho e alinhada a esquerda dele. lista e
+ * [{ deputado_id, nome, sigla_partido, sigla_uf, votacoes }] e total e o
+ * numero de votacoes do ano, para a dica. Reenquadra para caber tudo.
+ */
+export function mostrarForaDoGrafo(lista, total) {
+  cy.batch(() => {
+    cy.nodes('.fora, .rotulo-fora').remove();
+    if (!lista || lista.length === 0) return;
+
+    const caixa = cy.nodes().boundingBox({ includeLabels: false });
+    // a grade ocupa cerca de metade da largura do desenho
+    const colunas = Math.max(6, Math.floor((caixa.w * 0.5) / ESPACO_FORA));
+    const topo = caixa.y2 + AFASTAMENTO_FORA;
+    cy.add({
+      group: 'nodes',
+      classes: 'rotulo-fora',
+      data: { id: 'rotulo-fora', rotulo: `Fora do grafo · ${lista.length} deputados sem votações em comum suficientes` },
+      position: { x: caixa.x1, y: topo - ESPACO_FORA },
+    });
+    cy.add(lista.map((dep, i) => ({
+      group: 'nodes',
+      classes: 'fora',
+      data: {
+        id: String(dep.deputado_id),
+        nome: dep.nome,
+        rotulo: dep.nome,
+        partido: dep.sigla_partido,
+        uf: dep.sigla_uf,
+        cor: corDoPartido(dep.sigla_partido),
+        fora: true,
+        votacoes: dep.votacoes,
+        total,
+      },
+      position: { x: caixa.x1 + (i % colunas) * ESPACO_FORA, y: topo + Math.floor(i / colunas) * ESPACO_FORA },
+    })));
+  });
+  enquadrar();
 }
 
 /** Modo deputado: o no aumentado, os similares rotulados, o resto esmaecido. */
@@ -371,7 +452,8 @@ export function destacarPartido(sigla) {
   cy.batch(() => {
     limparClasses();
     if (!sigla) return;
-    const doPartido = cy.nodes().filter((no) => no.data('partido') === sigla);
+    // os cinzas fora do grafo nao entram no destaque do partido
+    const doPartido = cy.nodes(':not(.fora)').filter((no) => no.data('partido') === sigla);
     cy.elements().addClass('apagado');
     doPartido.removeClass('apagado').addClass('do-partido');
     doPartido.edgesWith(doPartido).removeClass('apagado').addClass('do-partido');
@@ -400,7 +482,7 @@ export function realcar(deputadoId, ligado) {
 export function aplicarTema() {
   lerCores();
   cy.batch(() => {
-    cy.nodes().forEach((no) => no.data('cor', corDoPartido(no.data('partido'))));
+    cy.nodes(':not(.rotulo-fora)').forEach((no) => no.data('cor', corDoPartido(no.data('partido'))));
   });
   cy.style(montarEstilo(lerTokens()));
 }

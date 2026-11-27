@@ -23,6 +23,7 @@ Historico de alteracoes:
       19/10/2026 - Isabela - Inclusao do router do grafo.
       19/10/2026 - Isabela - Inclusao do router de deputados.
       04/11/2026 - Caio - CORS configuravel por CORS_ORIGINS, para o deploy.
+      27/11/2026 - Kaique - Inclusao do router dos deputados fora do grafo.
 """
 
 import os
@@ -35,6 +36,7 @@ from banco import conectar
 from rotas.anos import router as anos_router
 from rotas.concordancias import router as concordancias_router
 from rotas.deputados import router as deputados_router
+from rotas.fora_do_grafo import router as fora_do_grafo_router
 from rotas.grafo import router as grafo_router
 
 app = FastAPI(title="O Gabinete - API")
@@ -54,6 +56,7 @@ app.include_router(anos_router)
 app.include_router(concordancias_router)
 app.include_router(grafo_router)
 app.include_router(deputados_router)
+app.include_router(fora_do_grafo_router)
 
 @app.get("/health")
 def health():

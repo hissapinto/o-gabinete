@@ -9,12 +9,14 @@
  *
  * Sintese:
  *     Busca de deputado com autocomplete (UC02). Aceita nome, partido ou UF,
- *     ignora acentos e so deixa escolher quem existe no grafo, o que evita
+ *     ignora acentos e so deixa escolher quem votou no ano, o que evita
  *     erro de digitacao. Segue o padrao combobox da WAI-ARIA: setas
  *     navegam, Enter escolhe, Esc fecha.
  *
  * Historico de alteracoes:
  *     29/10/2026 - Caio - Criacao, para o prototipo da Parte 3 de IHC.
+ *     27/11/2026 - Kaique - A busca tambem acha quem votou no ano mas ficou
+ *                           fora do grafo, marcado como tal na sugestao.
  */
 
 import { el, normalizar } from './dom.js';
@@ -55,13 +57,19 @@ export function iniciarBusca(eventos) {
   });
 }
 
-/** Deputados do ano carregado: [{ deputado_id, nome, sigla_partido, sigla_uf }]. */
-export function definirDeputados(nos) {
-  deputados = nos.map((no) => ({
-    ...no,
-    chaveNome: normalizar(no.nome),
-    chaveCompleta: normalizar(`${no.nome} ${no.sigla_partido} ${no.sigla_uf} ${no.sigla_partido}-${no.sigla_uf}`),
-  }));
+/**
+ * Deputados do ano carregado: [{ deputado_id, nome, sigla_partido, sigla_uf }].
+ * fora traz, no mesmo formato, quem votou mas ficou fora do grafo: a busca
+ * acha essas pessoas tambem, para ninguem "sumir" sem explicacao.
+ */
+export function definirDeputados(nos, fora = []) {
+  const indexar = (dep, foraDoGrafo) => ({
+    ...dep,
+    foraDoGrafo,
+    chaveNome: normalizar(dep.nome),
+    chaveCompleta: normalizar(`${dep.nome} ${dep.sigla_partido} ${dep.sigla_uf} ${dep.sigla_partido}-${dep.sigla_uf}`),
+  });
+  deputados = [...nos.map((no) => indexar(no, false)), ...fora.map((dep) => indexar(dep, true))];
 }
 
 /** Mostra o nome do deputado aberto na caixa de busca, como no esboco. */
@@ -95,7 +103,9 @@ function buscar(texto) {
     else if (dep.chaveNome.includes(termos[0])) peso = 2;
     achados.push({ dep, peso });
   }
-  achados.sort((a, b) => a.peso - b.peso || a.dep.chaveNome.localeCompare(b.dep.chaveNome));
+  // com o mesmo peso, quem esta no grafo vem antes de quem ficou fora
+  achados.sort((a, b) => a.peso - b.peso || a.dep.foraDoGrafo - b.dep.foraDoGrafo
+    || a.dep.chaveNome.localeCompare(b.dep.chaveNome));
   return achados.map((a) => a.dep);
 }
 
@@ -129,6 +139,7 @@ function atualizar() {
     },
     el('span', { class: 'ponto', style: { background: corDoPartido(dep.sigla_partido) }, 'aria-hidden': 'true' }),
     el('span', { class: 'sugestao-nome' }, ...destacar(dep.nome, entrada.value)),
+    dep.foraDoGrafo && el('span', { class: 'etiqueta', title: 'Votou no ano, mas não aparece no grafo' }, 'fora do grafo'),
     el('span', { class: 'sugestao-partido' }, `${dep.sigla_partido}-${dep.sigla_uf}`)));
   });
 

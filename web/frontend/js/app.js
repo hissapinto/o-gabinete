@@ -20,9 +20,11 @@
  *     04/11/2026 - Caio - Copia do prototipo; a mensagem de erro cita a API.
  *     04/11/2026 - Caio - Aviso "Acordando o servidor" enquanto o dados.js
  *                         tenta de novo.
+ *     27/11/2026 - Kaique - Deputados fora do grafo: aba na legenda, busca
+ *                           e ficha com o motivo (ideia da Isabela).
  */
 
-import { aoEsperarServidor, carregarAnos, carregarDeputado, carregarGrafo } from './dados.js';
+import { aoEsperarServidor, carregarAnos, carregarDeputado, carregarForaDoGrafo, carregarGrafo } from './dados.js';
 import { avisar, el, formatarNumero, formatarPercentual } from './dom.js';
 import { contarPartidos, corDoPartido } from './partidos.js';
 import * as grafo from './grafo.js';
@@ -44,6 +46,9 @@ const estado = {
   ficha: null,       // ficha mostrada no painel, para redesenhar na troca de tema
   partido: null,     // partido destacado na legenda
   pedido: 0,         // descarta respostas que chegam fora de ordem
+  fora: null,        // GET /anos/{ano}/fora-do-grafo, ou null se a API nao tem a rota
+  foraPorId: new Map(), // deputado_id -> quem votou mas ficou fora do grafo
+  abaLegenda: 'partidos', // 'partidos' ou 'fora'
 };
 
 const $ = (id) => document.getElementById(id);
@@ -157,6 +162,9 @@ async function abrirAno(ano) {
   }
 
   mostrarCarregando(`Carregando o grafo de ${ano}…`);
+  // a lista de quem ficou fora vem junto; se a API ainda nao tem a rota, o
+  // site segue funcionando sem ela
+  const pedidoFora = carregarForaDoGrafo(ano).catch(() => null);
   let dados;
   try {
     dados = await carregarGrafo(ano);
@@ -167,14 +175,18 @@ async function abrirAno(ano) {
       [{ texto: 'Tentar novamente', acao: () => { estado.ano = null; rotear(); } }]);
     return false;
   }
+  const fora = await pedidoFora;
   if (pedido !== estado.pedido) return false;
 
   estado.ano = ano;
   estado.dadosGrafo = dados;
   estado.porId = new Map(dados.nos.map((no) => [no.deputado_id, no]));
+  estado.fora = fora;
+  estado.foraPorId = new Map((fora?.deputados ?? []).map((d) => [d.deputado_id, d]));
   estado.partido = null;
   estado.faixa = grafo.desenhar(dados);
-  busca.definirDeputados(dados.nos);
+  if (estado.abaLegenda === 'fora') mostrarCinzas();
+  busca.definirDeputados(dados.nos, fora?.deputados ?? []);
   document.title = `O Gabinete · ${ano}`;
   esconderEstado();
 
@@ -188,6 +200,11 @@ async function abrirAno(ano) {
 async function abrirDeputado(deputadoId) {
   const no = estado.porId.get(deputadoId);
   if (!no) {
+    const fora = estado.foraPorId.get(deputadoId);
+    if (fora) {
+      await abrirForaDoGrafo(fora);
+      return;
+    }
     avisar(`Deputado ${deputadoId} não está no grafo de ${estado.ano}.`);
     navegar(estado.ano, null);
     return;
@@ -220,6 +237,45 @@ async function abrirDeputado(deputadoId) {
   grafo.focarDeputado(deputadoId, estado.ficha.mais_similares);
   mostrarFicha();
   document.title = `${no.nome} · O Gabinete ${estado.ano}`;
+}
+
+/**
+ * Ficha de quem votou no ano mas nao virou ponto: o grafo fica sem foco e o
+ * painel explica o motivo. A foto vem da mesma rota da ficha, que responde
+ * para quem votou mesmo fora do grafo; se ela falhar, a explicacao aparece
+ * assim mesmo, sem a foto.
+ */
+async function abrirForaDoGrafo(dep) {
+  const pedido = ++estado.pedido;
+  estado.deputadoId = dep.deputado_id;
+  estado.partido = null;
+  atualizarChipPartido();
+  document.body.classList.add('modo-deputado');
+  $('voltar-grafo').hidden = false;
+  busca.mostrarNome(dep.nome);
+  // com os cinzas na tela, o ponto dele ganha o foco; sem eles, nada a focar
+  if (estado.abaLegenda === 'fora') grafo.focarDeputado(dep.deputado_id, []);
+  else grafo.limparFoco();
+  painel.mostrarCarregandoDeputado(dep, () => navegar(estado.ano, null));
+  painel.abrirGaveta(true);
+
+  const info = {
+    ...dep,
+    total_votacoes: estado.fora.total_votacoes,
+    minimo_em_comum: estado.fora.minimo_em_comum,
+  };
+  let deputado = { ...dep, url_foto: null };
+  try {
+    deputado = (await carregarDeputado(estado.ano, dep.deputado_id)).deputado;
+  } catch {
+    // segue com o que a lista ja trouxe
+  }
+  if (pedido !== estado.pedido) return;
+
+  // o partido mostrado e o do ano, que a lista traz; o da ficha e o atual
+  estado.ficha = { ano: estado.ano, deputado: { ...deputado, sigla_partido: dep.sigla_partido }, mais_similares: [], fora: info };
+  mostrarFicha();
+  document.title = `${dep.nome} · O Gabinete ${estado.ano}`;
 }
 
 function mostrarFicha() {
@@ -258,7 +314,26 @@ function mostrarPainelGeral() {
     partidoAtivo: estado.partido,
     aoEscolherPartido: escolherPartido,
     aoPreverPartido: preverPartido,
+    fora: estado.fora,
+    aba: estado.abaLegenda,
+    aoTrocarAba: (aba) => {
+      estado.abaLegenda = aba;
+      if (aba === 'fora' && estado.partido) escolherPartido(estado.partido); // tira o destaque
+      mostrarPainelGeral();
+      mostrarCinzas();
+      document.getElementById(`aba-botao-${aba}`)?.focus();
+    },
+    aoEscolherDeputado: (id) => navegar(estado.ano, id),
   });
+}
+
+/**
+ * Os deputados fora do grafo aparecem em cinza, num canto a parte, so
+ * enquanto a aba "Fora do grafo" da legenda esta aberta.
+ */
+function mostrarCinzas() {
+  const ligado = estado.abaLegenda === 'fora' && estado.fora?.deputados.length > 0;
+  grafo.mostrarForaDoGrafo(ligado ? estado.fora.deputados : null, estado.fora?.total_votacoes);
 }
 
 /** Clique na legenda: fixa o destaque do partido; clicar de novo desfaz. */
@@ -326,7 +401,9 @@ function mostrarDica(dados, posicao) {
       el('span', { class: 'ponto', style: { background: corDoPartido(dados.partido) }, 'aria-hidden': 'true' }),
       `${dados.partido} · ${dados.uf}`),
     dados.posicao && el('span', { class: 'dica-similar' },
-      `${dados.posicao}º mais similar · ${formatarPercentual(dados.similaridade)}`)].filter(Boolean));
+      `${dados.posicao}º mais similar · ${formatarPercentual(dados.similaridade)}`),
+    dados.fora && el('span', { class: 'dica-similar' },
+      `Fora do grafo · votou em ${dados.votacoes} de ${dados.total}`)].filter(Boolean));
   dica.hidden = false;
   const area = $('grafo').getBoundingClientRect();
   const largura = dica.offsetWidth;

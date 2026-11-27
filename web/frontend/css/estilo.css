@@ -20,6 +20,8 @@
  *                         paleta de partidos e topo maior.
  *     29/10/2026 - Caio - Cor propria para os 20 partidos, botao de tema e
  *                         aviso do partido destacado.
+ *     27/11/2026 - Kaique - Abas da legenda e lista dos deputados fora do grafo,
+ *                           e os tokens --grafo-fora-* dos pontos cinza.
  */
 
 /* --- tokens: tema claro (padrao) ----------------------------------------- */
@@ -72,6 +74,10 @@
   --grafo-rotulo-tinta: #1d1f22;
   --grafo-rotulo-borda: #d6d6d0;
   --grafo-apagado-opacidade: .12;
+  /* deputados fora do grafo: cinza, contorno tracejado, num canto a parte */
+  --grafo-fora: #c9c9c3;
+  --grafo-fora-borda: #6c7077;
+  --grafo-fora-rotulo: #6c7077;
 
   /* Partidos (lidos pelo js/partidos.js), em distancia OKLab x100.
      Os 10 maiores, entre si: >= 17,9 na visao normal e >= 9,7 na
@@ -168,6 +174,9 @@
   --grafo-rotulo-tinta: #ecebe7;
   --grafo-rotulo-borda: #3b4148;
   --grafo-apagado-opacidade: .14;
+  --grafo-fora: #5d6168;
+  --grafo-fora-borda: #a3a29c;
+  --grafo-fora-rotulo: #8f8e88;
 
   --sombra: 0 1px 2px rgb(0 0 0 / .4), 0 4px 16px rgb(0 0 0 / .35);
   --sombra-forte: 0 8px 32px rgb(0 0 0 / .55);
@@ -756,6 +765,62 @@ a { color: var(--tinta-2); }
 .legenda.com-destaque .legenda-item:hover { opacity: 1; }
 .legenda-sigla { flex: 1; min-width: 0; font-weight: 600; font-size: 13px; overflow: hidden; text-overflow: ellipsis; }
 .legenda-total { font-size: 12px; color: var(--tinta-3); font-variant-numeric: tabular-nums; }
+
+/* abas da legenda: partidos e deputados fora do grafo */
+.abas { display: flex; gap: var(--e1); padding: 3px; background: var(--superficie-2); border-radius: var(--raio); }
+.aba {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--e2);
+  min-height: 34px;
+  padding: var(--e1) var(--e3);
+  border: 0;
+  border-radius: var(--raio-p);
+  background: transparent;
+  color: var(--tinta-2);
+  font-weight: 600;
+  font-size: 13px;
+}
+.aba:hover { color: var(--tinta); }
+.aba[aria-selected="true"] { background: var(--superficie); color: var(--tinta); box-shadow: 0 1px 2px rgb(0 0 0 / .08); }
+.aba-total { font-size: 12px; font-weight: 600; color: var(--tinta-3); font-variant-numeric: tabular-nums; }
+
+.etiqueta {
+  flex: none;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--superficie-2);
+  color: var(--tinta-3);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.fora { display: flex; flex-direction: column; gap: var(--e3); }
+.fora-lista { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 2px; }
+.fora-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--e3);
+  min-height: 44px;
+  padding: var(--e2) var(--e3);
+  border: 1px solid transparent;
+  border-radius: var(--raio-p);
+  background: transparent;
+  text-align: left;
+}
+.fora-item:hover { background: var(--superficie-2); }
+.fora-item .ponto { width: 10px; height: 10px; flex: none; }
+.fora-corpo { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.fora-nome { font-weight: 600; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fora-detalhe { display: flex; align-items: center; gap: var(--e2); font-size: 12px; color: var(--tinta-3); font-weight: 600; }
+.fora-votos { flex: none; font-weight: 700; font-size: 14px; font-variant-numeric: tabular-nums; }
+.fora-votos small { font-weight: 500; font-size: 11px; color: var(--tinta-3); }
+.vazio p { margin: 0; }
+.vazio p + p { margin-top: var(--e2); }
 
 .como-ler { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--e3); font-size: 13px; color: var(--tinta-2); }
 .como-ler li { display: flex; gap: var(--e3); align-items: flex-start; }
