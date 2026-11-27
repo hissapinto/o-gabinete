@@ -16,6 +16,8 @@ Sintese:
 Historico de alteracoes:
     14/09/2026 - Kaique - Criacao da limpeza dos votos e da tabela de deputados.
     25/09/2026 - Kaique - Inclusao do filtro de votacoes de merito.
+    27/11/2026 - Kaique - Tabela deputados-{ano}.csv com o partido de cada
+                          ano, para a analise de estabilidade entre anos.
 """
 
 import pandas as pd
@@ -46,8 +48,23 @@ def processar_votos(pasta_brutos):
         ['deputado_id', 'deputado_nome', 'deputado_siglaPartido', 'deputado_siglaUf', 'deputado_urlFoto']
     ].copy()
     deputados_df.to_csv(pasta_processado / 'deputados.csv', index=False)
+    # O deputados.csv continua igual (primeiro registro do arquivo), porque o
+    # rotulo do grafo.txt sai dele. Para comparar anos, cada ano ganha a sua
+    # tabela, com o partido que o deputado tinha naquele ano.
+    deputados_do_ano(df).to_csv(pasta_processado / f'deputados-{ANO_REFERENCIA}.csv', index=False)
 
     return df_limpo
+
+
+def deputados_do_ano(df_votos):
+    """
+    Um registro por deputado, com o partido e a UF do voto mais recente do
+    ano. O deputados.csv guarda o primeiro registro, que pode ser de antes de
+    uma troca de partido; aqui vale o ultimo, como na carga do banco.
+    """
+    colunas = ['deputado_id', 'deputado_nome', 'deputado_siglaPartido', 'deputado_siglaUf']
+    ultimo = df_votos.sort_values(['dataHoraVoto', 'idVotacao']).drop_duplicates('deputado_id', keep='last')
+    return ultimo[colunas].sort_values('deputado_id').reset_index(drop=True)
 
 
 def votacoes_de_merito(pasta_brutos):
